@@ -7,7 +7,7 @@ assignees: emin-okic
 
 ---
 
-**What's the issue?*
+**What's the issue?**
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
 
 **What's the solution?**
