@@ -7,6 +7,9 @@
 
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -202,6 +205,17 @@ private struct ApplicationForm: View {
     var onSave: (JobApplication) -> Void
     var onCancel: () -> Void
 
+    enum Step: Int, CaseIterable { case basics, details, review }
+    @State private var step: Step = .basics
+
+    // Focus & validation state
+    enum Field { case company, position }
+    @FocusState private var focusedField: Field?
+    @State private var attemptedAdvance: Bool = false
+
+    // Transition direction: 1 = forward, -1 = back
+    @State private var navigationDirection: Int = 1
+
     init(existing: JobApplication? = nil, onSave: @escaping (JobApplication) -> Void, onCancel: @escaping () -> Void) {
         _company = State(initialValue: existing?.company ?? "")
         _position = State(initialValue: existing?.position ?? "")
@@ -214,32 +228,276 @@ private struct ApplicationForm: View {
     }
 
     var body: some View {
-        Form {
-            Section("Position") {
-                TextField("Company", text: $company)
-                TextField("Role / Position", text: $position)
+        VStack(spacing: 12) {
+            stepHeader
+
+            ZStack {
+                switch step {
+                case .basics:
+                    basicsForm
+                        .transition(stepTransition)
+                case .details:
+                    detailsForm
+                        .transition(stepTransition)
+                case .review:
+                    reviewForm
+                        .transition(stepTransition)
+                }
             }
-            Section("Details") {
+            .id(step)
+            .contentTransition(.opacity)
+            .animation(.spring(response: 0.45, dampingFraction: 0.85), value: step)
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 30, coordinateSpace: .local)
+                    .onEnded { value in
+                        let horizontal = value.translation.width
+                        let vertical = abs(value.translation.height)
+                        guard abs(horizontal) > vertical else { return } // ignore mostly-vertical drags
+                        if horizontal < -40 {
+                            goNext()
+                        } else if horizontal > 40 {
+                            goBack()
+                        }
+                    }
+            )
+        }
+        .navigationTitle(stepNavigationTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel") { onCancel(); dismiss() }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            actionBar
+        }
+    }
+
+    private var stepHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ProgressView(value: Double(step.rawValue + 1), total: Double(Step.allCases.count))
+                .tint(.blue)
+            HStack {
+                stepLabel(for: .basics, title: "Basics")
+                Spacer()
+                stepLabel(for: .details, title: "Details")
+                Spacer()
+                stepLabel(for: .review, title: "Review")
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private func stepLabel(for s: Step, title: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "\(s.rawValue + 1).circle\(step == s ? ".fill" : "")")
+                .foregroundStyle(step == s ? .blue : .secondary)
+            Text(title)
+                .foregroundStyle(step == s ? .primary : .secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(step == s ? Color.blue.opacity(0.12) : Color.secondary.opacity(0.08))
+        )
+    }
+
+    private var basicsForm: some View {
+        Form {
+            Section("Basics") {
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField("Company", text: $company)
+                        .textContentType(.organizationName)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .submitLabel(.next)
+                        .focused($focusedField, equals: .company)
+                        .padding(.vertical, 2)
+                        .modifier(ValidationModifier(isInvalid: companyInvalid))
+                        .onSubmit {
+                            focusedField = .position
+                        }
+                    if companyInvalid {
+                        InlineErrorText("Company is required.")
+                    }
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField("Role / Position", text: $position)
+                        .textContentType(.jobTitle)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .submitLabel(.next)
+                        .focused($focusedField, equals: .position)
+                        .padding(.vertical, 2)
+                        .modifier(ValidationModifier(isInvalid: positionInvalid))
+                        .onSubmit {
+                            goNext()
+                        }
+                    if positionInvalid {
+                        InlineErrorText("Position is required.")
+                    }
+                }
+            }
+        }
+    }
+
+    private var detailsForm: some View {
+        Form {
+            Section("Status & Timing") {
                 Picker("Status", selection: $status) {
                     ForEach(["Applied", "Interview", "Offer", "Rejected"], id: \.self) { s in
                         Text(s).tag(s)
                     }
                 }
+                .pickerStyle(.segmented)
+
                 DatePicker("Date Applied", selection: $dateApplied, displayedComponents: .date)
+            }
+            Section("Location") {
                 TextField("Location (optional)", text: $location)
-                TextField("Notes (optional)", text: $notes, axis: .vertical)
-                    .lineLimit(3, reservesSpace: true)
+                    .textContentType(.addressCity)
             }
         }
-        .navigationTitle("Application")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Cancel") { onCancel(); dismiss() }
+    }
+
+    private var reviewForm: some View {
+        Form {
+            Section("Notes") {
+                TextField("Notes (optional)", text: $notes, axis: .vertical)
+                    .lineLimit(4, reservesSpace: true)
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Save") { save() }
-                    .disabled(company.trimmingCharacters(in: .whitespaces).isEmpty || position.trimmingCharacters(in: .whitespaces).isEmpty)
+
+            Section("Summary") {
+                LabeledContent("Company", value: company.isEmpty ? "—" : company)
+                LabeledContent("Position", value: position.isEmpty ? "—" : position)
+                LabeledContent("Status", value: status)
+                LabeledContent("Applied", value: dateApplied.formatted(date: .abbreviated, time: .omitted))
+                if !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    LabeledContent("Location", value: location)
+                }
+                if !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    LabeledContent("Notes", value: notes)
+                }
             }
+        }
+    }
+
+    private var actionBar: some View {
+        HStack(spacing: 12) {
+            if step != .basics {
+                Button {
+                    goBack()
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                }
+            }
+            Spacer()
+            if step == .review {
+                Button {
+                    save()
+                } label: {
+                    Label("Save", systemImage: "checkmark.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!isBasicsValid)
+                .accessibilityIdentifier("saveApplicationButton")
+            } else {
+                Button {
+                    goNext()
+                } label: {
+                    Label("Next", systemImage: "chevron.right.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("nextStepButton")
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .background(.thinMaterial)
+        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: -2)
+    }
+
+    private var companyInvalid: Bool {
+        attemptedAdvance && company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var positionInvalid: Bool {
+        attemptedAdvance && position.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var isBasicsValid: Bool {
+        !company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !position.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var stepTransition: AnyTransition {
+        let insertionEdge: Edge = navigationDirection > 0 ? .trailing : .leading
+        let removalEdge: Edge = navigationDirection > 0 ? .leading : .trailing
+        return .asymmetric(
+            insertion: .move(edge: insertionEdge).combined(with: .opacity),
+            removal: .move(edge: removalEdge).combined(with: .opacity)
+        )
+    }
+
+    private var stepNavigationTitle: String {
+        switch step {
+        case .basics: return "Basics"
+        case .details: return "Details"
+        case .review: return "Review"
+        }
+    }
+
+    private func goNext() {
+        switch step {
+        case .basics:
+            attemptedAdvance = true
+            if isBasicsValid {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                    navigationDirection = 1
+                    step = .details
+                }
+                feedbackAdvance()
+            } else {
+                // focus first invalid field and provide error feedback
+                if company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    focusedField = .company
+                } else if position.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    focusedField = .position
+                }
+                feedbackError()
+            }
+        case .details:
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                navigationDirection = 1
+                step = .review
+            }
+            feedbackAdvance()
+        case .review:
+            save()
+        }
+    }
+
+    private func goBack() {
+        switch step {
+        case .basics:
+            break
+        case .details:
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                navigationDirection = -1
+                step = .basics
+            }
+            feedbackBack()
+        case .review:
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                navigationDirection = -1
+                step = .details
+            }
+            feedbackBack()
         }
     }
 
@@ -251,7 +509,71 @@ private struct ApplicationForm: View {
                                  location: location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : location,
                                  notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes)
         onSave(app)
+        feedbackSuccess()
         dismiss()
+    }
+
+    // MARK: - Haptics
+    private func feedbackAdvance() {
+        #if canImport(UIKit)
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.8)
+        #endif
+    }
+
+    private func feedbackBack() {
+        #if canImport(UIKit)
+        let generator = UIImpactFeedbackGenerator(style: .rigid)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.6)
+        #endif
+    }
+
+    private func feedbackError() {
+        #if canImport(UIKit)
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(.error)
+        #endif
+    }
+
+    private func feedbackSuccess() {
+        #if canImport(UIKit)
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(.success)
+        #endif
+    }
+
+    // MARK: - Inline validation helpers
+    private struct ValidationModifier: ViewModifier {
+        let isInvalid: Bool
+        func body(content: Content) -> some View {
+            content
+                .padding(.horizontal, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isInvalid ? Color.red.opacity(0.06) : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(isInvalid ? Color.red.opacity(0.6) : Color.clear, lineWidth: 1)
+                )
+        }
+    }
+
+    @ViewBuilder
+    private func InlineErrorText(_ message: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.red)
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.red)
+        }
+        .accessibilityHint(message)
     }
 }
 
@@ -312,3 +634,4 @@ private struct ApplicationDetail: View {
         return Text("Preview failed to load model container: \(error.localizedDescription)")
     }
 }
+
