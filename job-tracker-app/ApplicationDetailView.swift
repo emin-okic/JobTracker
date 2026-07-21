@@ -34,7 +34,6 @@ struct ApplicationDetailView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle(app.position)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { trailingMenu }
         .sheet(isPresented: $showingEdit) {
             NavigationStack {
                 ApplicationFormView(existing: app) { updated in
@@ -183,20 +182,6 @@ struct ApplicationDetailView: View {
             #if canImport(UIKit)
             UIApplication.shared.open(url)
             #endif
-        }
-    }
-
-    private var trailingMenu: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-                Button("Edit") { showingEdit = true }
-                Button("Share") { showShare = true }
-                Button(role: .destructive) { showingDeleteConfirm = true } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-            }
         }
     }
 
