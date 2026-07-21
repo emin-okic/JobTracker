@@ -14,10 +14,12 @@ import UIKit
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\JobApplication.dateApplied, order: .reverse)]) private var applications: [JobApplication]
+    @State private var editMode: EditMode = .inactive
 
     @State private var showingAddSheet = false
     @State private var searchText = ""
     @State private var path: [UUID] = []
+    @State private var selectedIDs: Set<UUID> = []
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -26,17 +28,6 @@ struct ContentView: View {
                 list
             }
             .navigationTitle("Job Tracker")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { showingAddSheet = true }) {
-                        Label("Add", systemImage: "plus")
-                    }
-                    .accessibilityIdentifier("addApplicationButton")
-                }
-                ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
-                }
-            }
             .sheet(isPresented: $showingAddSheet) {
                 NavigationStack {
                     ApplicationForm { newApp in
@@ -55,6 +46,13 @@ struct ContentView: View {
                     Text("Application not found")
                 }
             }
+            .overlay(alignment: .bottomLeading) {
+                floatingToolbar
+            }
+            .onChange(of: editMode) { newValue in
+                if newValue != .active { selectedIDs.removeAll() }
+            }
+            .environment(\.editMode, $editMode)
         }
     }
 
@@ -79,21 +77,33 @@ struct ContentView: View {
     }
 
     private var list: some View {
-        List {
-            ForEach(filteredApplications) { app in
-                Button {
-                    path.append(app.id)
-                } label: {
+        List(selection: $selectedIDs) {
+            if isEditing {
+                ForEach(filteredApplications) { app in
                     KanbanRow(app: app)
+                        .tag(app.id)
+                        .contextMenu {
+                            Button(role: .destructive) { delete(app) } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                 }
-                .buttonStyle(.plain)
-                .contextMenu {
-                    Button(role: .destructive) { delete(app) } label: {
-                        Label("Delete", systemImage: "trash")
+            } else {
+                ForEach(filteredApplications) { app in
+                    Button {
+                        path.append(app.id)
+                    } label: {
+                        KanbanRow(app: app)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button(role: .destructive) { delete(app) } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
+                .onDelete(perform: delete)
             }
-            .onDelete(perform: delete)
         }
         .listStyle(.plain)
         .listRowSeparator(.hidden)
@@ -120,6 +130,109 @@ struct ContentView: View {
 
     private func delete(_ app: JobApplication) {
         withAnimation { modelContext.delete(app) }
+    }
+
+    private func deleteSelected() {
+        guard !selectedIDs.isEmpty else { return }
+        withAnimation {
+            for id in selectedIDs {
+                if let app = applications.first(where: { $0.id == id }) {
+                    modelContext.delete(app)
+                }
+            }
+        }
+        selectedIDs.removeAll()
+    }
+
+    // MARK: - Floating Toolbar
+
+    private var isEditing: Bool {
+        editMode == .active
+    }
+
+    private func toggleEditMode() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+            if isEditing {
+                editMode = .inactive
+                selectedIDs.removeAll()
+            } else {
+                editMode = .active
+            }
+        }
+        #if canImport(UIKit)
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.8)
+        #endif
+    }
+
+    @ViewBuilder
+    private var floatingToolbar: some View {
+        if path.isEmpty {
+            VStack(spacing: 12) {
+                // Add button (top)
+                Button {
+                    showingAddSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(
+                            Circle().fill(
+                                LinearGradient(colors: [Color.blue, Color.cyan],
+                                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                        )
+                }
+                .buttonStyle(.plain)
+                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 6)
+                .accessibilityIdentifier("addApplicationButton")
+                .accessibilityLabel("Add Job Application")
+
+                // Trash (only while editing)
+                if isEditing {
+                    Button(action: deleteSelected) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .background(
+                                Circle().fill(
+                                    LinearGradient(colors: selectedIDs.isEmpty ? [Color.gray.opacity(0.95), Color.gray.opacity(0.8)] : [Color.red, Color.orange],
+                                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                                )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 6)
+                    .disabled(selectedIDs.isEmpty)
+                    .accessibilityIdentifier("deleteSelectedButton")
+                    .accessibilityLabel("Delete Selected Applications")
+                }
+
+                // Edit toggle (bottom, like Hinge's X position)
+                Button(action: toggleEditMode) {
+                    Image(systemName: isEditing ? "xmark" : "pencil")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(
+                            Circle().fill(
+                                LinearGradient(colors: isEditing ? [Color.red, Color.orange] : [Color.gray.opacity(0.95), Color.gray.opacity(0.8)],
+                                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                        )
+                }
+                .buttonStyle(.plain)
+                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 6)
+                .accessibilityIdentifier("editModeToggleButton")
+                .accessibilityLabel(isEditing ? "Exit Edit Mode" : "Enter Edit Mode")
+            }
+            .padding(.leading, 16)
+            .padding(.bottom, 16)
+            .transition(.move(edge: .leading).combined(with: .opacity))
+        }
     }
 }
 
