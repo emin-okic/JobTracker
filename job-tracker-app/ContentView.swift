@@ -108,6 +108,7 @@ struct ContentView: View {
         .listStyle(.plain)
         .listRowSeparator(.hidden)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic))
+        .deleteDisabled(isEditing)
     }
 
     private var filteredApplications: [JobApplication] {
@@ -170,25 +171,27 @@ struct ContentView: View {
     private var floatingToolbar: some View {
         if path.isEmpty {
             VStack(spacing: 12) {
-                // Add button (top)
-                Button {
-                    showingAddSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 56, height: 56)
-                        .background(
-                            Circle().fill(
-                                LinearGradient(colors: [Color.blue, Color.cyan],
-                                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                // Add button (only when not editing)
+                if !isEditing {
+                    Button {
+                        showingAddSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .background(
+                                Circle().fill(
+                                    LinearGradient(colors: [Color.blue, Color.cyan],
+                                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                                )
                             )
-                        )
+                    }
+                    .buttonStyle(.plain)
+                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 6)
+                    .accessibilityIdentifier("addApplicationButton")
+                    .accessibilityLabel("Add Job Application")
                 }
-                .buttonStyle(.plain)
-                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 6)
-                .accessibilityIdentifier("addApplicationButton")
-                .accessibilityLabel("Add Job Application")
 
                 // Trash (only while editing)
                 if isEditing {
