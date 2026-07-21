@@ -14,9 +14,10 @@ struct ContentView: View {
 
     @State private var showingAddSheet = false
     @State private var searchText = ""
+    @State private var path: [UUID] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 banner
                 list
@@ -44,6 +45,13 @@ struct ContentView: View {
                 }
                 .presentationDetents([.medium, .large])
             }
+            .navigationDestination(for: UUID.self) { id in
+                if let app = applications.first(where: { $0.id == id }) {
+                    ApplicationDetail(app: app)
+                } else {
+                    Text("Application not found")
+                }
+            }
         }
     }
 
@@ -70,9 +78,12 @@ struct ContentView: View {
     private var list: some View {
         List {
             ForEach(filteredApplications) { app in
-                NavigationLink(value: app.id) {
+                Button {
+                    path.append(app.id)
+                } label: {
                     KanbanRow(app: app)
                 }
+                .buttonStyle(.plain)
                 .contextMenu {
                     Button(role: .destructive) { delete(app) } label: {
                         Label("Delete", systemImage: "trash")
@@ -82,14 +93,8 @@ struct ContentView: View {
             .onDelete(perform: delete)
         }
         .listStyle(.plain)
+        .listRowSeparator(.hidden)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic))
-        .navigationDestination(for: UUID.self) { id in
-            if let app = applications.first(where: { $0.id == id }) {
-                ApplicationDetail(app: app)
-            } else {
-                Text("Application not found")
-            }
-        }
     }
 
     private var filteredApplications: [JobApplication] {
@@ -148,8 +153,14 @@ private struct KanbanRow: View {
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(.background)
-                .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.vertical, 4)
     }
 }
 
