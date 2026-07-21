@@ -53,15 +53,51 @@ struct ApplicationDetailView: View {
         .sheet(isPresented: $showShare) {
             ShareSheet(activityItems: [shareText])
         }
-        .confirmationDialog("Delete Application?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
-            Button("Delete", role: .destructive) {
-                modelContext.delete(app)
-                feedbackDelete()
-                dismiss()
+        .sheet(isPresented: $showingDeleteConfirm) {
+            VStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(colors: [.red, .orange], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 56, height: 56)
+                .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+
+                Text("Delete this application?")
+                    .font(.headline)
+
+                Text("This will permanently remove the application for \(app.position) at \(app.company). This action cannot be undone.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                HStack(spacing: 12) {
+                    Button("Cancel") {
+                        showingDeleteConfirm = false
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+
+                    Button(role: .destructive) {
+                        modelContext.delete(app)
+                        feedbackDelete()
+                        showingDeleteConfirm = false
+                        dismiss()
+                    } label: {
+                        Label("Delete", systemImage: "trash.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .controlSize(.large)
+                }
             }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This cannot be undone.")
+            .padding(20)
+            .presentationDetents([.fraction(0.33)])
+            .presentationDragIndicator(.visible)
         }
     }
 
