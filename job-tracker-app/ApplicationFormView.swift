@@ -17,6 +17,12 @@ struct ApplicationFormView: View {
     @State private var location: String
     @State private var notes: String
 
+    @State private var companyURL: String
+    @State private var jobURL: String
+
+    @StateObject private var searchVM = CompanySearchViewModel()
+    @State private var showSuggestions: Bool = true
+
     var onSave: (JobApplication) -> Void
     var onCancel: () -> Void
 
@@ -35,6 +41,8 @@ struct ApplicationFormView: View {
         _dateApplied = State(initialValue: existing?.dateApplied ?? Date())
         _location = State(initialValue: existing?.location ?? "")
         _notes = State(initialValue: existing?.notes ?? "")
+        _companyURL = State(initialValue: existing?.companyURL ?? "")
+        _jobURL = State(initialValue: existing?.jobURL ?? "")
         self.onSave = onSave
         self.onCancel = onCancel
     }
@@ -131,11 +139,87 @@ struct ApplicationFormView: View {
                         .focused($focusedField, equals: .company)
                         .padding(.vertical, 2)
                         .modifier(ValidationModifier(isInvalid: companyInvalid))
+                        .onChange(of: company) { newValue in
+                            searchVM.query = newValue
+                            showSuggestions = true
+                        }
                         .onSubmit {
                             focusedField = .position
                         }
+
                     if companyInvalid {
                         InlineErrorText("Company is required.")
+                    }
+
+                    // Suggestions List
+                    if showSuggestions && !searchVM.results.isEmpty {
+                        VStack(spacing: 0) {
+                            ForEach(searchVM.results.prefix(3)) { item in
+                                Button {
+                                    company = item.name
+                                    if !item.domain.isEmpty {
+                                        companyURL = "https://\(item.domain)"
+                                    }
+                                    showSuggestions = false
+                                    focusedField = .position
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        AsyncImage(url: URL(string: item.logo_url)) { phase in
+                                            switch phase {
+                                            case .empty:
+                                                ProgressView().frame(width: 28, height: 28)
+                                            case .success(let image):
+                                                image.resizable().scaledToFit()
+                                                    .frame(width: 28, height: 28)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                            case .failure:
+                                                ZStack {
+                                                    RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.gray.opacity(0.2))
+                                                    Image(systemName: "building.2").foregroundStyle(.secondary)
+                                                }
+                                                .frame(width: 28, height: 28)
+                                            @unknown default:
+                                                EmptyView().frame(width: 28, height: 28)
+                                            }
+                                        }
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(item.name).font(.subheadline)
+                                            Text(item.domain).font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 8)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                Divider()
+                            }
+                            HStack {
+                                Spacer()
+                                Link("Logos by Logo.dev", destination: URL(string: "https://logo.dev")!)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.top, 4)
+                        }
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color(.secondarySystemBackground))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
+                        .transition(.opacity)
+                    } else if searchVM.isLoading && !company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Searching companies…")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 6)
                     }
                 }
                 VStack(alignment: .leading, spacing: 4) {
@@ -174,6 +258,19 @@ struct ApplicationFormView: View {
                 TextField("Location (optional)", text: $location)
                     .textContentType(.addressCity)
             }
+            Section("Links") {
+                TextField("Company website (optional)", text: $companyURL)
+                    .keyboardType(.URL)
+                    .textContentType(.URL)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+
+                TextField("Job posting URL (optional)", text: $jobURL)
+                    .keyboardType(.URL)
+                    .textContentType(.URL)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
         }
     }
 
@@ -189,6 +286,12 @@ struct ApplicationFormView: View {
                 LabeledContent("Position", value: position.isEmpty ? "—" : position)
                 LabeledContent("Status", value: status)
                 LabeledContent("Applied", value: dateApplied.formatted(date: .abbreviated, time: .omitted))
+                if !companyURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    LabeledContent("Company URL", value: companyURL)
+                }
+                if !jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    LabeledContent("Job URL", value: jobURL)
+                }
                 if !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     LabeledContent("Location", value: location)
                 }
@@ -318,7 +421,9 @@ struct ApplicationFormView: View {
                                  status: status,
                                  dateApplied: dateApplied,
                                  location: location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : location,
-                                 notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes)
+                                 notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes,
+                                 companyURL: companyURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : companyURL,
+                                 jobURL: jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobURL)
         onSave(app)
         feedbackSuccess()
         dismiss()
@@ -387,3 +492,4 @@ private func InlineErrorText(_ message: String) -> some View {
     }
     .accessibilityHint(message)
 }
+

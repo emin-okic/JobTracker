@@ -44,6 +44,8 @@ struct ApplicationDetailView: View {
                     app.dateApplied = updated.dateApplied
                     app.location = updated.location
                     app.notes = updated.notes
+                    app.companyURL = updated.companyURL
+                    app.jobURL = updated.jobURL
                     showingEdit = false
                 } onCancel: {
                     showingEdit = false
@@ -141,6 +143,20 @@ struct ApplicationDetailView: View {
                     openMaps(for: location)
                 }
             }
+            if let urlString = app.companyURL, let url = URL(string: urlString), !urlString.isEmpty {
+                QuickActionButton(systemName: "globe", title: "Website") {
+                    #if canImport(UIKit)
+                    UIApplication.shared.open(url)
+                    #endif
+                }
+            }
+            if let urlString = app.jobURL, let url = URL(string: urlString), !urlString.isEmpty {
+                QuickActionButton(systemName: "link", title: "Job Post") {
+                    #if canImport(UIKit)
+                    UIApplication.shared.open(url)
+                    #endif
+                }
+            }
             QuickActionButton(systemName: "trash", title: "Delete", role: .destructive) {
                 showingDeleteConfirm = true
             }
@@ -164,6 +180,16 @@ struct ApplicationDetailView: View {
             if let location = app.location, !location.isEmpty {
                 InfoCard(title: "Location", systemImage: "mappin.and.ellipse") {
                     Text(location)
+                }
+            }
+            if let urlString = app.companyURL, !urlString.isEmpty {
+                InfoCard(title: "Company URL", systemImage: "globe") {
+                    Text(urlString)
+                }
+            }
+            if let urlString = app.jobURL, !urlString.isEmpty {
+                InfoCard(title: "Job URL", systemImage: "link") {
+                    Text(urlString)
                 }
             }
         }
