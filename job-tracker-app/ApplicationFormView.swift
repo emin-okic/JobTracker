@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import MapKit
+import Contacts
 
 struct ApplicationFormView: View {
     @Environment(\.dismiss) private var dismiss
@@ -160,6 +162,7 @@ struct ApplicationFormView: View {
                                     if !item.domain.isEmpty {
                                         companyURL = "https://\(item.domain)"
                                     }
+                                    autofillCompanyAddress(name: item.name, domain: item.domain)
                                     showSuggestions = false
                                     focusedField = .position
                                 } label: {
@@ -461,6 +464,90 @@ struct ApplicationFormView: View {
         generator.notificationOccurred(.success)
         #endif
     }
+
+    // MARK: - Apple Places (MapKit) lookup for company address
+    private func autofillCompanyAddress(name: String, domain: String) {
+        Task {
+            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines)
+            let queries: [String] = [
+                "\(trimmedName) headquarters",
+                "\(trimmedName) corporate headquarters",
+                trimmedDomain.isEmpty ? trimmedName : "\(trimmedName) \(trimmedDomain)"
+            ]
+
+            var chosen: MKMapItem?
+            for q in queries {
+                var request = MKLocalSearch.Request()
+                request.naturalLanguageQuery = q
+                // Prefer POIs (businesses) over generic addresses
+                request.resultTypes = [.pointOfInterest]
+                let search = MKLocalSearch(request: request)
+                do {
+                    let response = try await search.start()
+                    if let best = bestMapItem(from: response.mapItems, forName: trimmedName, domain: trimmedDomain) {
+                        chosen = best
+                        break
+                    }
+                } catch {
+                    // Try next query
+                }
+            }
+
+            if let item = chosen {
+                let address = formattedAddress(from: item)
+                await MainActor.run {
+                    self.location = address
+                }
+            }
+        }
+    }
+
+    private func bestMapItem(from items: [MKMapItem], forName name: String, domain: String) -> MKMapItem? {
+        guard !items.isEmpty else { return nil }
+        let target = name.lowercased()
+        let scored = items.map { item -> (MKMapItem, Int) in
+            var score = 0
+            let lowerName = (item.name ?? "").lowercased()
+
+            // Prefer exact/partial name match
+            if lowerName == target { score += 20 }
+            if lowerName.contains(target) { score += 10 }
+
+            // Prefer official/corporate results
+            if lowerName.contains("headquarters") || lowerName.contains("hq") || lowerName.contains("campus") { score += 40 }
+
+            // Prefer items whose URL matches the company's domain
+            if domainMatches(url: item.url, domain: domain) { score += 60 }
+
+            // Penalize retail/service locations
+            if lowerName.contains("store") || lowerName.contains("reseller") || lowerName.contains("service") || lowerName.contains("care") { score -= 50 }
+
+            // Prefer items with a precise street address
+            if let postal = item.placemark.postalAddress, !postal.street.isEmpty { score += 10 }
+
+            return (item, score)
+        }
+        .sorted { $0.1 > $1.1 }
+
+        if let best = scored.first, best.1 > 0 { return best.0 }
+        return nil
+    }
+
+    private func domainMatches(url: URL?, domain: String) -> Bool {
+        guard let url = url, !domain.isEmpty, let host = url.host?.lowercased() else { return false }
+        let d = domain.lowercased()
+        return host == d || host.hasSuffix("." + d)
+    }
+
+    private func formattedAddress(from item: MKMapItem) -> String {
+        if let postal = item.placemark.postalAddress {
+            let formatter = CNPostalAddressFormatter()
+            formatter.style = .mailingAddress
+            return formatter.string(from: postal).replacingOccurrences(of: "\n", with: ", ")
+        }
+        return item.placemark.title ?? item.name ?? ""
+    }
 }
 
 // MARK: - Inline validation helpers
@@ -492,4 +579,3 @@ private func InlineErrorText(_ message: String) -> some View {
     }
     .accessibilityHint(message)
 }
-
