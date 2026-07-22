@@ -17,6 +17,8 @@ final class JobApplication: Identifiable {
     var dateApplied: Date
     var location: String?
     var notes: String?
+    var companyURL: String?
+    var jobURL: String?
 
     init(id: UUID = UUID(),
          company: String,
@@ -24,7 +26,9 @@ final class JobApplication: Identifiable {
          status: String = "Applied",
          dateApplied: Date = Date(),
          location: String? = nil,
-         notes: String? = nil) {
+         notes: String? = nil,
+         companyURL: String? = nil,
+         jobURL: String? = nil) {
         self.id = id
         self.company = company
         self.position = position
@@ -32,5 +36,8 @@ final class JobApplication: Identifiable {
         self.dateApplied = dateApplied
         self.location = location
         self.notes = notes
+        self.companyURL = companyURL
+        self.jobURL = jobURL
     }
 }
+

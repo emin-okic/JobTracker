@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import MapKit
+import Contacts
 
 struct ApplicationFormView: View {
     @Environment(\.dismiss) private var dismiss
@@ -16,6 +18,13 @@ struct ApplicationFormView: View {
     @State private var dateApplied: Date
     @State private var location: String
     @State private var notes: String
+
+    @State private var companyURL: String
+    @State private var jobURL: String
+
+    @StateObject private var searchVM = CompanySearchViewModel()
+//    @State private var showSuggestions: Bool = true  // Removed as per instruction
+    @State private var suppressSuggestionRefresh: Bool = false
 
     var onSave: (JobApplication) -> Void
     var onCancel: () -> Void
@@ -35,6 +44,8 @@ struct ApplicationFormView: View {
         _dateApplied = State(initialValue: existing?.dateApplied ?? Date())
         _location = State(initialValue: existing?.location ?? "")
         _notes = State(initialValue: existing?.notes ?? "")
+        _companyURL = State(initialValue: existing?.companyURL ?? "")
+        _jobURL = State(initialValue: existing?.jobURL ?? "")
         self.onSave = onSave
         self.onCancel = onCancel
     }
@@ -123,20 +134,50 @@ struct ApplicationFormView: View {
         Form {
             Section("Basics") {
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("Company", text: $company)
-                        .textContentType(.organizationName)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
-                        .submitLabel(.next)
-                        .focused($focusedField, equals: .company)
-                        .padding(.vertical, 2)
-                        .modifier(ValidationModifier(isInvalid: companyInvalid))
-                        .onSubmit {
-                            focusedField = .position
+                    ZStack(alignment: .leading) {
+                        TextField("Company", text: $company)
+                            .textContentType(.organizationName)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .submitLabel(.next)
+                            .focused($focusedField, equals: .company)
+                            .onChange(of: company) { newValue in
+                                if suppressSuggestionRefresh {
+                                    suppressSuggestionRefresh = false
+                                    return
+                                }
+                                searchVM.query = newValue
+                            }
+                            .onSubmit {
+                                acceptInlinePredictionOrAdvance()
+                            }
+
+                        if let suffix = inlinePredictionSuffix, !suffix.isEmpty {
+                            HStack(spacing: 0) {
+                                Text(company)
+                                    .font(.body)
+                                    .opacity(0)
+                                    .allowsHitTesting(false)
+                                Button(action: {
+                                    acceptInlinePredictionOrAdvance()
+                                }) {
+                                    Text(suffix)
+                                        .font(.body)
+                                        .foregroundStyle(.secondary.opacity(0.6))
+                                }
+                                .buttonStyle(.plain)
+                                .contentShape(Rectangle())
+                            }
                         }
+                    }
+                    .padding(.vertical, 2)
+                    .modifier(ValidationModifier(isInvalid: companyInvalid))
+
                     if companyInvalid {
                         InlineErrorText("Company is required.")
                     }
+
+                    // Removed Suggestions List UI as per instructions
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     TextField("Role / Position", text: $position)
@@ -174,6 +215,19 @@ struct ApplicationFormView: View {
                 TextField("Location (optional)", text: $location)
                     .textContentType(.addressCity)
             }
+            Section("Links") {
+                TextField("Company website (optional)", text: $companyURL)
+                    .keyboardType(.URL)
+                    .textContentType(.URL)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+
+                TextField("Job posting URL (optional)", text: $jobURL)
+                    .keyboardType(.URL)
+                    .textContentType(.URL)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
         }
     }
 
@@ -189,6 +243,12 @@ struct ApplicationFormView: View {
                 LabeledContent("Position", value: position.isEmpty ? "—" : position)
                 LabeledContent("Status", value: status)
                 LabeledContent("Applied", value: dateApplied.formatted(date: .abbreviated, time: .omitted))
+                if !companyURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    LabeledContent("Company URL", value: companyURL)
+                }
+                if !jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    LabeledContent("Job URL", value: jobURL)
+                }
                 if !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     LabeledContent("Location", value: location)
                 }
@@ -245,6 +305,39 @@ struct ApplicationFormView: View {
     private var isBasicsValid: Bool {
         !company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !position.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var inlinePrediction: SearchResult? {
+        let typed = company.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty else { return nil }
+        guard let first = searchVM.results.first else { return nil }
+        if first.name.lowercased().hasPrefix(typed.lowercased()) {
+            return first
+        }
+        return nil
+    }
+
+    private var inlinePredictionSuffix: String? {
+        guard let prediction = inlinePrediction else { return nil }
+        let typedCount = company.count
+        guard prediction.name.count > typedCount else { return nil }
+        return String(prediction.name.dropFirst(typedCount))
+    }
+
+    private func acceptInlinePredictionOrAdvance() {
+        if let prediction = inlinePrediction {
+            suppressSuggestionRefresh = true
+            company = prediction.name
+            if !prediction.domain.isEmpty {
+                companyURL = "https://\(prediction.domain)"
+            }
+            autofillCompanyAddress(name: prediction.name, domain: prediction.domain)
+//            showSuggestions = false  // Removed as per instructions
+            searchVM.clearResults()
+            focusedField = .position
+        } else {
+            focusedField = .position
+        }
     }
 
     private var stepTransition: AnyTransition {
@@ -318,7 +411,9 @@ struct ApplicationFormView: View {
                                  status: status,
                                  dateApplied: dateApplied,
                                  location: location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : location,
-                                 notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes)
+                                 notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes,
+                                 companyURL: companyURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : companyURL,
+                                 jobURL: jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobURL)
         onSave(app)
         feedbackSuccess()
         dismiss()
@@ -356,6 +451,90 @@ struct ApplicationFormView: View {
         generator.notificationOccurred(.success)
         #endif
     }
+
+    // MARK: - Apple Places (MapKit) lookup for company address
+    private func autofillCompanyAddress(name: String, domain: String) {
+        Task {
+            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines)
+            let queries: [String] = [
+                "\(trimmedName) headquarters",
+                "\(trimmedName) corporate headquarters",
+                trimmedDomain.isEmpty ? trimmedName : "\(trimmedName) \(trimmedDomain)"
+            ]
+
+            var chosen: MKMapItem?
+            for q in queries {
+                var request = MKLocalSearch.Request()
+                request.naturalLanguageQuery = q
+                // Prefer POIs (businesses) over generic addresses
+                request.resultTypes = [.pointOfInterest]
+                let search = MKLocalSearch(request: request)
+                do {
+                    let response = try await search.start()
+                    if let best = bestMapItem(from: response.mapItems, forName: trimmedName, domain: trimmedDomain) {
+                        chosen = best
+                        break
+                    }
+                } catch {
+                    // Try next query
+                }
+            }
+
+            if let item = chosen {
+                let address = formattedAddress(from: item)
+                await MainActor.run {
+                    self.location = address
+                }
+            }
+        }
+    }
+
+    private func bestMapItem(from items: [MKMapItem], forName name: String, domain: String) -> MKMapItem? {
+        guard !items.isEmpty else { return nil }
+        let target = name.lowercased()
+        let scored = items.map { item -> (MKMapItem, Int) in
+            var score = 0
+            let lowerName = (item.name ?? "").lowercased()
+
+            // Prefer exact/partial name match
+            if lowerName == target { score += 20 }
+            if lowerName.contains(target) { score += 10 }
+
+            // Prefer official/corporate results
+            if lowerName.contains("headquarters") || lowerName.contains("hq") || lowerName.contains("campus") { score += 40 }
+
+            // Prefer items whose URL matches the company's domain
+            if domainMatches(url: item.url, domain: domain) { score += 60 }
+
+            // Penalize retail/service locations
+            if lowerName.contains("store") || lowerName.contains("reseller") || lowerName.contains("service") || lowerName.contains("care") { score -= 50 }
+
+            // Prefer items with a precise street address
+            if let postal = item.placemark.postalAddress, !postal.street.isEmpty { score += 10 }
+
+            return (item, score)
+        }
+        .sorted { $0.1 > $1.1 }
+
+        if let best = scored.first, best.1 > 0 { return best.0 }
+        return nil
+    }
+
+    private func domainMatches(url: URL?, domain: String) -> Bool {
+        guard let url = url, !domain.isEmpty, let host = url.host?.lowercased() else { return false }
+        let d = domain.lowercased()
+        return host == d || host.hasSuffix("." + d)
+    }
+
+    private func formattedAddress(from item: MKMapItem) -> String {
+        if let postal = item.placemark.postalAddress {
+            let formatter = CNPostalAddressFormatter()
+            formatter.style = .mailingAddress
+            return formatter.string(from: postal).replacingOccurrences(of: "\n", with: ", ")
+        }
+        return item.placemark.title ?? item.name ?? ""
+    }
 }
 
 // MARK: - Inline validation helpers
@@ -387,3 +566,4 @@ private func InlineErrorText(_ message: String) -> some View {
     }
     .accessibilityHint(message)
 }
+
