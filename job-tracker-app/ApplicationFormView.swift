@@ -23,7 +23,8 @@ struct ApplicationFormView: View {
     @State private var jobURL: String
 
     @StateObject private var searchVM = CompanySearchViewModel()
-    @State private var showSuggestions: Bool = true
+//    @State private var showSuggestions: Bool = true  // Removed as per instruction
+    @State private var suppressSuggestionRefresh: Bool = false
 
     var onSave: (JobApplication) -> Void
     var onCancel: () -> Void
@@ -133,97 +134,50 @@ struct ApplicationFormView: View {
         Form {
             Section("Basics") {
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("Company", text: $company)
-                        .textContentType(.organizationName)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
-                        .submitLabel(.next)
-                        .focused($focusedField, equals: .company)
-                        .padding(.vertical, 2)
-                        .modifier(ValidationModifier(isInvalid: companyInvalid))
-                        .onChange(of: company) { newValue in
-                            searchVM.query = newValue
-                            showSuggestions = true
+                    ZStack(alignment: .leading) {
+                        TextField("Company", text: $company)
+                            .textContentType(.organizationName)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .submitLabel(.next)
+                            .focused($focusedField, equals: .company)
+                            .onChange(of: company) { newValue in
+                                if suppressSuggestionRefresh {
+                                    suppressSuggestionRefresh = false
+                                    return
+                                }
+                                searchVM.query = newValue
+                            }
+                            .onSubmit {
+                                acceptInlinePredictionOrAdvance()
+                            }
+
+                        if let suffix = inlinePredictionSuffix, !suffix.isEmpty {
+                            HStack(spacing: 0) {
+                                Text(company)
+                                    .font(.body)
+                                    .opacity(0)
+                                    .allowsHitTesting(false)
+                                Button(action: {
+                                    acceptInlinePredictionOrAdvance()
+                                }) {
+                                    Text(suffix)
+                                        .font(.body)
+                                        .foregroundStyle(.secondary.opacity(0.6))
+                                }
+                                .buttonStyle(.plain)
+                                .contentShape(Rectangle())
+                            }
                         }
-                        .onSubmit {
-                            focusedField = .position
-                        }
+                    }
+                    .padding(.vertical, 2)
+                    .modifier(ValidationModifier(isInvalid: companyInvalid))
 
                     if companyInvalid {
                         InlineErrorText("Company is required.")
                     }
 
-                    // Suggestions List
-                    if showSuggestions && !searchVM.results.isEmpty {
-                        VStack(spacing: 0) {
-                            ForEach(searchVM.results.prefix(3)) { item in
-                                Button {
-                                    company = item.name
-                                    if !item.domain.isEmpty {
-                                        companyURL = "https://\(item.domain)"
-                                    }
-                                    autofillCompanyAddress(name: item.name, domain: item.domain)
-                                    showSuggestions = false
-                                    focusedField = .position
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        AsyncImage(url: URL(string: item.logo_url)) { phase in
-                                            switch phase {
-                                            case .empty:
-                                                ProgressView().frame(width: 28, height: 28)
-                                            case .success(let image):
-                                                image.resizable().scaledToFit()
-                                                    .frame(width: 28, height: 28)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                            case .failure:
-                                                ZStack {
-                                                    RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.gray.opacity(0.2))
-                                                    Image(systemName: "building.2").foregroundStyle(.secondary)
-                                                }
-                                                .frame(width: 28, height: 28)
-                                            @unknown default:
-                                                EmptyView().frame(width: 28, height: 28)
-                                            }
-                                        }
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(item.name).font(.subheadline)
-                                            Text(item.domain).font(.caption).foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 8)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                Divider()
-                            }
-                            HStack {
-                                Spacer()
-                                Link("Logos by Logo.dev", destination: URL(string: "https://logo.dev")!)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.top, 4)
-                        }
-                        .padding(8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color(.secondarySystemBackground))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                        )
-                        .transition(.opacity)
-                    } else if searchVM.isLoading && !company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                            Text("Searching companies…")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 6)
-                    }
+                    // Removed Suggestions List UI as per instructions
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     TextField("Role / Position", text: $position)
@@ -351,6 +305,39 @@ struct ApplicationFormView: View {
     private var isBasicsValid: Bool {
         !company.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !position.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var inlinePrediction: SearchResult? {
+        let typed = company.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty else { return nil }
+        guard let first = searchVM.results.first else { return nil }
+        if first.name.lowercased().hasPrefix(typed.lowercased()) {
+            return first
+        }
+        return nil
+    }
+
+    private var inlinePredictionSuffix: String? {
+        guard let prediction = inlinePrediction else { return nil }
+        let typedCount = company.count
+        guard prediction.name.count > typedCount else { return nil }
+        return String(prediction.name.dropFirst(typedCount))
+    }
+
+    private func acceptInlinePredictionOrAdvance() {
+        if let prediction = inlinePrediction {
+            suppressSuggestionRefresh = true
+            company = prediction.name
+            if !prediction.domain.isEmpty {
+                companyURL = "https://\(prediction.domain)"
+            }
+            autofillCompanyAddress(name: prediction.name, domain: prediction.domain)
+//            showSuggestions = false  // Removed as per instructions
+            searchVM.clearResults()
+            focusedField = .position
+        } else {
+            focusedField = .position
+        }
     }
 
     private var stepTransition: AnyTransition {
@@ -579,3 +566,4 @@ private func InlineErrorText(_ message: String) -> some View {
     }
     .accessibilityHint(message)
 }
+
