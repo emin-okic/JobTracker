@@ -14,11 +14,14 @@ import UIKit
 struct ApplicationDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @State private var showingEdit = false
-    @State private var showingDeleteConfirm = false
-    @State private var showShare = false
+    @StateObject private var viewModel: ApplicationDetailViewModel
 
     let app: JobApplication
+
+    init(app: JobApplication) {
+        self.app = app
+        _viewModel = StateObject(wrappedValue: ApplicationDetailViewModel(app: app, policy: .lockedIfExisting))
+    }
 
     var body: some View {
         ScrollView {
@@ -34,28 +37,20 @@ struct ApplicationDetailView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle(app.position)
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingEdit) {
+        .sheet(isPresented: $viewModel.showingEdit) {
             NavigationStack {
-                ApplicationFormView(existing: app) { updated in
-                    // Update existing model with new values
-                    app.company = updated.company
-                    app.position = updated.position
-                    app.status = updated.status
-                    app.dateApplied = updated.dateApplied
-                    app.location = updated.location
-                    app.notes = updated.notes
-                    app.companyURL = updated.companyURL
-                    app.jobURL = updated.jobURL
-                    showingEdit = false
+                ApplicationEditFormView(existing: app) { updated in
+                    viewModel.update(with: updated)
+                    viewModel.showingEdit = false
                 } onCancel: {
-                    showingEdit = false
+                    viewModel.showingEdit = false
                 }
             }
         }
-        .sheet(isPresented: $showShare) {
-            ShareSheet(activityItems: [shareText])
+        .sheet(isPresented: $viewModel.showShare) {
+            ShareSheet(activityItems: [viewModel.shareText])
         }
-        .sheet(isPresented: $showingDeleteConfirm) {
+        .sheet(isPresented: $viewModel.showingDeleteConfirm) {
             VStack(spacing: 16) {
                 ZStack {
                     Circle()
@@ -77,7 +72,7 @@ struct ApplicationDetailView: View {
 
                 HStack(spacing: 12) {
                     Button("Cancel") {
-                        showingDeleteConfirm = false
+                        viewModel.showingDeleteConfirm = false
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
@@ -86,7 +81,7 @@ struct ApplicationDetailView: View {
                     Button(role: .destructive) {
                         modelContext.delete(app)
                         feedbackDelete()
-                        showingDeleteConfirm = false
+                        viewModel.showingDeleteConfirm = false
                         dismiss()
                     } label: {
                         Label("Delete", systemImage: "trash.fill")
@@ -136,8 +131,8 @@ struct ApplicationDetailView: View {
 
     private var quickActions: some View {
         HStack(spacing: 12) {
-            QuickActionButton(systemName: "square.and.pencil", title: "Edit") { showingEdit = true }
-            QuickActionButton(systemName: "square.and.arrow.up", title: "Share") { showShare = true }
+            QuickActionButton(systemName: "square.and.pencil", title: "Edit") { viewModel.showingEdit = true }
+            QuickActionButton(systemName: "square.and.arrow.up", title: "Share") { viewModel.showShare = true }
             if let location = app.location, !location.isEmpty {
                 QuickActionButton(systemName: "map", title: "Maps") {
                     openMaps(for: location)
@@ -158,7 +153,7 @@ struct ApplicationDetailView: View {
                 }
             }
             QuickActionButton(systemName: "trash", title: "Delete", role: .destructive) {
-                showingDeleteConfirm = true
+                viewModel.showingDeleteConfirm = true
             }
         }
         .padding(.horizontal, 4)
@@ -227,17 +222,6 @@ struct ApplicationDetailView: View {
         }
     }
 
-    private var shareText: String {
-        var parts: [String] = []
-        parts.append("Position: \(app.position)")
-        parts.append("Company: \(app.company)")
-        if let location = app.location { parts.append("Location: \(location)") }
-        parts.append("Status: \(app.status)")
-        parts.append("Applied: \(app.dateApplied.formatted(date: .abbreviated, time: .omitted))")
-        if let notes = app.notes, !notes.isEmpty { parts.append("Notes: \(notes)") }
-        return parts.joined(separator: "\n")
-    }
-
     private func openMaps(for query: String) {
         let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
         if let url = URL(string: "http://maps.apple.com/?q=\(encoded)") {
@@ -255,4 +239,3 @@ struct ApplicationDetailView: View {
         #endif
     }
 }
-
