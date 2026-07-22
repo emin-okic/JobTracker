@@ -29,13 +29,14 @@ struct ApplicationFormView: View {
     var onSave: (JobApplication) -> Void
     var onCancel: () -> Void
 
-    enum Step: Int, CaseIterable { case basics, details, review }
+    enum Step: Int, CaseIterable { case basics, details, notes, review }
     @State private var step: Step = .basics
 
     enum Field { case company, position }
     @FocusState private var focusedField: Field?
     @State private var attemptedAdvance: Bool = false
     @State private var navigationDirection: Int = 1
+    @State private var selectedDetent: PresentationDetent = .medium
 
     init(existing: JobApplication? = nil, onSave: @escaping (JobApplication) -> Void, onCancel: @escaping () -> Void) {
         _company = State(initialValue: existing?.company ?? "")
@@ -61,6 +62,9 @@ struct ApplicationFormView: View {
                         .transition(stepTransition)
                 case .details:
                     detailsForm
+                        .transition(stepTransition)
+                case .notes:
+                    notesForm
                         .transition(stepTransition)
                 case .review:
                     reviewForm
@@ -94,6 +98,10 @@ struct ApplicationFormView: View {
         .safeAreaInset(edge: .bottom) {
             actionBar
         }
+        .presentationDetents([.medium, .large], selection: $selectedDetent)
+        .presentationDragIndicator(.visible)
+        .onAppear { updateDetentForStep() }
+        .onChange(of: step) { _ in updateDetentForStep() }
     }
 
     private var stepHeader: some View {
@@ -102,10 +110,12 @@ struct ApplicationFormView: View {
                 .tint(.blue)
             HStack {
                 stepLabel(for: .basics, title: "Basics")
-                Spacer()
+                Spacer(minLength: 8)
                 stepLabel(for: .details, title: "Details")
-                Spacer()
-                stepLabel(for: .review, title: "Review")
+                Spacer(minLength: 8)
+                stepLabel(for: .notes, title: "Notes")
+                Spacer(minLength: 8)
+                stepLabel(for: .review, title: "Confirm")
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -231,13 +241,17 @@ struct ApplicationFormView: View {
         }
     }
 
-    private var reviewForm: some View {
+    private var notesForm: some View {
         Form {
             Section("Notes") {
                 TextField("Notes (optional)", text: $notes, axis: .vertical)
                     .lineLimit(4, reservesSpace: true)
             }
+        }
+    }
 
+    private var reviewForm: some View {
+        Form {
             Section("Summary") {
                 LabeledContent("Company", value: company.isEmpty ? "—" : company)
                 LabeledContent("Position", value: position.isEmpty ? "—" : position)
@@ -353,7 +367,14 @@ struct ApplicationFormView: View {
         switch step {
         case .basics: return "Basics"
         case .details: return "Details"
-        case .review: return "Review"
+        case .notes: return "Notes"
+        case .review: return "Confirm"
+        }
+    }
+
+    private func updateDetentForStep() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+            selectedDetent = (step == .basics) ? .medium : .large
         }
     }
 
@@ -378,6 +399,12 @@ struct ApplicationFormView: View {
         case .details:
             withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                 navigationDirection = 1
+                step = .notes
+            }
+            feedbackAdvance()
+        case .notes:
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                navigationDirection = 1
                 step = .review
             }
             feedbackAdvance()
@@ -396,10 +423,16 @@ struct ApplicationFormView: View {
                 step = .basics
             }
             feedbackBack()
-        case .review:
+        case .notes:
             withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                 navigationDirection = -1
                 step = .details
+            }
+            feedbackBack()
+        case .review:
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                navigationDirection = -1
+                step = .notes
             }
             feedbackBack()
         }
@@ -566,4 +599,3 @@ private func InlineErrorText(_ message: String) -> some View {
     }
     .accessibilityHint(message)
 }
-
