@@ -1,37 +1,37 @@
 //
-//  ApplicationFormView.swift
+//  ApplicationEditFormView.swift
 //  job-tracker-app
 //
-//  Extracted by Assistant
+//  Dedicated edit form for ApplicationDetailView without a Notes step.
 //
 
 import SwiftUI
 import MapKit
 import Contacts
 
-struct ApplicationFormView: View {
+struct ApplicationEditFormView: View {
     @Environment(\.dismiss) private var dismiss
 
+    // Existing values to edit
     @State private var company: String
     @State private var position: String
     @State private var status: String
     @State private var dateApplied: Date
     @State private var location: String
-    @State private var notes: String
-    private let originalNotes: String?
 
     @State private var companyURL: String
     @State private var jobURL: String
 
+    private let originalNotes: String?
+    private let existingID: UUID
+
     @StateObject private var searchVM = CompanySearchViewModel()
-//    @State private var showSuggestions: Bool = true  // Removed as per instruction
     @State private var suppressSuggestionRefresh: Bool = false
 
     var onSave: (JobApplication) -> Void
     var onCancel: () -> Void
-    private let notesPolicy: NotesEditingPolicy
 
-    enum Step: Int, CaseIterable { case basics, details, notes, review }
+    enum Step: Int, CaseIterable { case basics, details, review }
     @State private var step: Step = .basics
 
     enum Field { case company, position }
@@ -40,17 +40,16 @@ struct ApplicationFormView: View {
     @State private var navigationDirection: Int = 1
     @State private var selectedDetent: PresentationDetent = .medium
 
-    init(existing: JobApplication? = nil, notesPolicy: NotesEditingPolicy = .alwaysEditable, onSave: @escaping (JobApplication) -> Void, onCancel: @escaping () -> Void) {
-        _company = State(initialValue: existing?.company ?? "")
-        _position = State(initialValue: existing?.position ?? "")
-        _status = State(initialValue: existing?.status ?? "Applied")
-        _dateApplied = State(initialValue: existing?.dateApplied ?? Date())
-        _location = State(initialValue: existing?.location ?? "")
-        _notes = State(initialValue: existing?.notes ?? "")
-        self.originalNotes = existing?.notes
-        _companyURL = State(initialValue: existing?.companyURL ?? "")
-        _jobURL = State(initialValue: existing?.jobURL ?? "")
-        self.notesPolicy = notesPolicy
+    init(existing: JobApplication, onSave: @escaping (JobApplication) -> Void, onCancel: @escaping () -> Void) {
+        _company = State(initialValue: existing.company)
+        _position = State(initialValue: existing.position)
+        _status = State(initialValue: existing.status)
+        _dateApplied = State(initialValue: existing.dateApplied)
+        _location = State(initialValue: existing.location ?? "")
+        _companyURL = State(initialValue: existing.companyURL ?? "")
+        _jobURL = State(initialValue: existing.jobURL ?? "")
+        self.originalNotes = existing.notes
+        self.existingID = existing.id
         self.onSave = onSave
         self.onCancel = onCancel
     }
@@ -66,9 +65,6 @@ struct ApplicationFormView: View {
                         .transition(stepTransition)
                 case .details:
                     detailsForm
-                        .transition(stepTransition)
-                case .notes:
-                    notesForm
                         .transition(stepTransition)
                 case .review:
                     reviewForm
@@ -116,8 +112,6 @@ struct ApplicationFormView: View {
                 stepLabel(for: .basics, title: "Basics")
                 Spacer(minLength: 8)
                 stepLabel(for: .details, title: "Details")
-                Spacer(minLength: 8)
-                stepLabel(for: .notes, title: "Notes")
                 Spacer(minLength: 8)
                 stepLabel(for: .review, title: "Confirm")
             }
@@ -190,8 +184,6 @@ struct ApplicationFormView: View {
                     if companyInvalid {
                         InlineErrorText("Company is required.")
                     }
-
-                    // Removed Suggestions List UI as per instructions
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     TextField("Role / Position", text: $position)
@@ -245,24 +237,6 @@ struct ApplicationFormView: View {
         }
     }
 
-    private var notesForm: some View {
-        Form {
-            Section("Notes") {
-                if notesPolicy.isEditable(existingNotes: originalNotes) {
-                    TextField("Notes (optional)", text: $notes, axis: .vertical)
-                        .lineLimit(4, reservesSpace: true)
-                } else {
-                    Text(originalNotes ?? "")
-                        .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
-                        .foregroundColor(.secondary)
-                        .padding(8)
-                        .background(Color(UIColor.secondarySystemBackground))
-                        .cornerRadius(8)
-                }
-            }
-        }
-    }
-
     private var reviewForm: some View {
         Form {
             Section("Summary") {
@@ -278,9 +252,6 @@ struct ApplicationFormView: View {
                 }
                 if !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     LabeledContent("Location", value: location)
-                }
-                if !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    LabeledContent("Notes", value: notes)
                 }
             }
         }
@@ -304,7 +275,6 @@ struct ApplicationFormView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(!isBasicsValid)
-                .accessibilityIdentifier("saveApplicationButton")
             } else {
                 Button {
                     goNext()
@@ -312,7 +282,6 @@ struct ApplicationFormView: View {
                     Label("Next", systemImage: "chevron.right.circle.fill")
                 }
                 .buttonStyle(.borderedProminent)
-                .accessibilityIdentifier("nextStepButton")
             }
         }
         .padding(.horizontal)
@@ -359,7 +328,6 @@ struct ApplicationFormView: View {
                 companyURL = "https://\(prediction.domain)"
             }
             autofillCompanyAddress(name: prediction.name, domain: prediction.domain)
-//            showSuggestions = false  // Removed as per instructions
             searchVM.clearResults()
             focusedField = .position
         } else {
@@ -380,7 +348,6 @@ struct ApplicationFormView: View {
         switch step {
         case .basics: return "Basics"
         case .details: return "Details"
-        case .notes: return "Notes"
         case .review: return "Confirm"
         }
     }
@@ -412,12 +379,6 @@ struct ApplicationFormView: View {
         case .details:
             withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                 navigationDirection = 1
-                step = .notes
-            }
-            feedbackAdvance()
-        case .notes:
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                navigationDirection = 1
                 step = .review
             }
             feedbackAdvance()
@@ -436,28 +397,23 @@ struct ApplicationFormView: View {
                 step = .basics
             }
             feedbackBack()
-        case .notes:
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                navigationDirection = -1
-                step = .details
-            }
-            feedbackBack()
         case .review:
             withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
                 navigationDirection = -1
-                step = .notes
+                step = .details
             }
             feedbackBack()
         }
     }
 
     private func save() {
-        let app = JobApplication(company: company.trimmingCharacters(in: .whitespacesAndNewlines),
+        let app = JobApplication(id: existingID,
+                                 company: company.trimmingCharacters(in: .whitespacesAndNewlines),
                                  position: position.trimmingCharacters(in: .whitespacesAndNewlines),
                                  status: status,
                                  dateApplied: dateApplied,
                                  location: location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : location,
-                                 notes: notesPolicy.isEditable(existingNotes: originalNotes) ? (notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes) : originalNotes,
+                                 notes: originalNotes, // preserve existing notes; no editing in this form
                                  companyURL: companyURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : companyURL,
                                  jobURL: jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobURL)
         onSave(app)
@@ -513,7 +469,6 @@ struct ApplicationFormView: View {
             for q in queries {
                 var request = MKLocalSearch.Request()
                 request.naturalLanguageQuery = q
-                // Prefer POIs (businesses) over generic addresses
                 request.resultTypes = [.pointOfInterest]
                 let search = MKLocalSearch(request: request)
                 do {
@@ -543,20 +498,11 @@ struct ApplicationFormView: View {
             var score = 0
             let lowerName = (item.name ?? "").lowercased()
 
-            // Prefer exact/partial name match
             if lowerName == target { score += 20 }
             if lowerName.contains(target) { score += 10 }
-
-            // Prefer official/corporate results
             if lowerName.contains("headquarters") || lowerName.contains("hq") || lowerName.contains("campus") { score += 40 }
-
-            // Prefer items whose URL matches the company's domain
             if domainMatches(url: item.url, domain: domain) { score += 60 }
-
-            // Penalize retail/service locations
             if lowerName.contains("store") || lowerName.contains("reseller") || lowerName.contains("service") || lowerName.contains("care") { score -= 50 }
-
-            // Prefer items with a precise street address
             if let postal = item.placemark.postalAddress, !postal.street.isEmpty { score += 10 }
 
             return (item, score)
@@ -583,7 +529,7 @@ struct ApplicationFormView: View {
     }
 }
 
-// MARK: - Inline validation helpers
+// MARK: - Inline validation helpers (reused)
 private struct ValidationModifier: ViewModifier {
     let isInvalid: Bool
     func body(content: Content) -> some View {
