@@ -36,4 +36,37 @@ struct job_tracker_appTests {
 
         #expect(decoded == originalNotes)
     }
+
+    @MainActor
+    @Test func jobTitleSuggestionsPrioritizeTechRolesByDefault() async throws {
+        let service = JobTitleSuggestionService()
+
+        let suggestions = service.suggestions(for: "", limit: 5)
+
+        #expect(suggestions.map(\.title) == [
+            "Software Engineer",
+            "Frontend Engineer",
+            "Backend Engineer",
+            "Full Stack Engineer",
+            "Mobile Engineer"
+        ])
+    }
+
+    @MainActor
+    @Test func jobTitleSuggestionsMatchAliases() async throws {
+        let service = JobTitleSuggestionService()
+
+        let suggestions = service.suggestions(for: "sdet", limit: 3)
+
+        #expect(suggestions.first?.title == "Software Development Engineer in Test")
+    }
+
+    @MainActor
+    @Test func jobTitleSuggestionsIncludeGeneralRoles() async throws {
+        let service = JobTitleSuggestionService()
+
+        let suggestions = service.suggestions(for: "nurse", limit: 3)
+
+        #expect(suggestions.first?.title == "Nurse")
+    }
 }

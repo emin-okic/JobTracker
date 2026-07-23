@@ -26,7 +26,9 @@ struct ApplicationEditFormView: View {
     private let existingID: UUID
 
     @StateObject private var searchVM = CompanySearchViewModel()
+    @StateObject private var jobTitleVM = JobTitleSuggestionViewModel()
     @State private var suppressSuggestionRefresh: Bool = false
+    @State private var suppressJobTitleSuggestionRefresh: Bool = false
 
     var onSave: (JobApplication) -> Void
     var onCancel: () -> Void
@@ -102,6 +104,7 @@ struct ApplicationEditFormView: View {
         .presentationDragIndicator(.visible)
         .onAppear { updateDetentForStep() }
         .onChange(of: step) { _ in updateDetentForStep() }
+        .onChange(of: jobTitleVM.suggestions) { updateDetentForStep() }
     }
 
     private var stepHeader: some View {
@@ -194,11 +197,32 @@ struct ApplicationEditFormView: View {
                         .focused($focusedField, equals: .position)
                         .padding(.vertical, 2)
                         .modifier(ValidationModifier(isInvalid: positionInvalid))
-                        .onSubmit {
-                            goNext()
+                        .onChange(of: position) { newValue in
+                            if suppressJobTitleSuggestionRefresh {
+                                suppressJobTitleSuggestionRefresh = false
+                                return
+                            }
+                            jobTitleVM.query = newValue
                         }
+                        .onChange(of: focusedField) { newValue in
+                            if newValue == .position {
+                                jobTitleVM.refreshSuggestions()
+                            } else {
+                                jobTitleVM.clearSuggestions()
+                            }
+                        }
+                        .onSubmit {
+                            acceptJobTitleSuggestionOrAdvance()
+                        }
+
                     if positionInvalid {
                         InlineErrorText("Position is required.")
+                    }
+
+                    if focusedField == .position {
+                        JobTitleSuggestionsView(suggestions: jobTitleVM.suggestions) { suggestion in
+                            selectJobTitle(suggestion)
+                        }
                     }
                 }
             }
@@ -335,6 +359,25 @@ struct ApplicationEditFormView: View {
         }
     }
 
+    private func acceptJobTitleSuggestionOrAdvance() {
+        let typed = position.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let firstSuggestion = jobTitleVM.suggestions.first,
+           !typed.isEmpty,
+           firstSuggestion.title.lowercased().hasPrefix(typed.lowercased()) {
+            selectJobTitle(firstSuggestion)
+        } else {
+            goNext()
+        }
+    }
+
+    private func selectJobTitle(_ suggestion: StandardJobTitle) {
+        suppressJobTitleSuggestionRefresh = true
+        position = suggestion.title
+        jobTitleVM.clearSuggestions()
+        focusedField = nil
+        updateDetentForStep()
+    }
+
     private var stepTransition: AnyTransition {
         let insertionEdge: Edge = navigationDirection > 0 ? .trailing : .leading
         let removalEdge: Edge = navigationDirection > 0 ? .leading : .trailing
@@ -352,9 +395,13 @@ struct ApplicationEditFormView: View {
         }
     }
 
+    private var shouldExpandForJobTitleSuggestions: Bool {
+        step == .basics && focusedField == .position && !jobTitleVM.suggestions.isEmpty
+    }
+
     private func updateDetentForStep() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
-            selectedDetent = (step == .basics) ? .medium : .large
+            selectedDetent = (step == .basics && !shouldExpandForJobTitleSuggestions) ? .medium : .large
         }
     }
 
