@@ -17,13 +17,49 @@ struct ContentView: View {
     @State private var editMode: EditMode = .inactive
 
     @State private var showingAddSheet = false
+    @State private var selectedProgressRange: ApplicationProgressRange?
     @State private var searchText = ""
     @State private var path: [UUID] = []
     @State private var selectedIDs: Set<UUID> = []
 
+    private enum ApplicationProgressRange: String, Identifiable {
+        case today
+        case week
+
+        var id: String { rawValue }
+
+        var filterTitle: String {
+            switch self {
+            case .today:
+                "Daily job apps sent"
+            case .week:
+                "Weekly job apps sent"
+            }
+        }
+
+        var cardTitle: String {
+            switch self {
+            case .today:
+                "Daily apps sent"
+            case .week:
+                "Weekly apps sent"
+            }
+        }
+
+        var systemImage: String {
+            switch self {
+            case .today:
+                "calendar.badge.checkmark"
+            case .week:
+                "calendar"
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
+                progressCards
                 banner
                 list
             }
@@ -49,11 +85,61 @@ struct ContentView: View {
             .overlay(alignment: .bottomLeading) {
                 floatingToolbar
             }
-            .onChange(of: editMode) { newValue in
+            .onChange(of: editMode) { _, newValue in
                 if newValue != .active { selectedIDs.removeAll() }
             }
             .environment(\.editMode, $editMode)
         }
+    }
+
+    private var progressCards: some View {
+        HStack(spacing: 12) {
+            progressCard(for: .today, count: todaysApplications.count)
+            progressCard(for: .week, count: weeklyApplications.count)
+        }
+        .padding([.horizontal, .top])
+    }
+
+    private func progressCard(for range: ApplicationProgressRange, count: Int) -> some View {
+        let isSelected = selectedProgressRange == range
+
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                selectedProgressRange = range
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: range.systemImage)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .symbolRenderingMode(.hierarchical)
+
+                Text("\(count)")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+
+                Text(range.cardTitle)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 112, alignment: .center)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? Color.blue.opacity(0.1) : Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? Color.blue.opacity(0.7) : Color.secondary.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("\(range.rawValue)ApplicationProgressCard")
+        .accessibilityLabel("\(range.filterTitle), \(count) applications")
+        .accessibilityHint(isSelected ? "This filter is already active" : "Double tap to filter the job application list")
     }
 
     private var banner: some View {
@@ -78,6 +164,11 @@ struct ContentView: View {
 
     private var list: some View {
         List(selection: $selectedIDs) {
+            if let selectedProgressRange {
+                activeFilterRow(for: selectedProgressRange)
+                    .listRowSeparator(.hidden)
+            }
+
             if isEditing {
                 ForEach(filteredApplications) { app in
                     KanbanRow(app: app)
@@ -111,21 +202,67 @@ struct ContentView: View {
         .deleteDisabled(isEditing)
     }
 
+    private func activeFilterRow(for range: ApplicationProgressRange) -> some View {
+        HStack(spacing: 10) {
+            Label(range.filterTitle, systemImage: range.systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                    selectedProgressRange = nil
+                }
+            } label: {
+                Text("Show All")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.blue)
+            .accessibilityIdentifier("clearApplicationProgressFilterButton")
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 8)
+    }
+
     private var filteredApplications: [JobApplication] {
+        let rangeFilteredApplications = selectedProgressRange.map(applications(for:)) ?? applications
+
         if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return applications
+            return rangeFilteredApplications
         }
         let query = searchText.lowercased()
-        return applications.filter { app in
+        return rangeFilteredApplications.filter { app in
             app.company.lowercased().contains(query) ||
             app.position.lowercased().contains(query) ||
             app.status.lowercased().contains(query)
         }
     }
 
+    private var todaysApplications: [JobApplication] {
+        applications.filter { Calendar.current.isDateInToday($0.dateApplied) }
+    }
+
+    private var weeklyApplications: [JobApplication] {
+        guard let week = Calendar.current.dateInterval(of: .weekOfYear, for: Date()) else {
+            return []
+        }
+        return applications.filter { week.contains($0.dateApplied) }
+    }
+
+    private func applications(for range: ApplicationProgressRange) -> [JobApplication] {
+        switch range {
+        case .today:
+            todaysApplications
+        case .week:
+            weeklyApplications
+        }
+    }
+
     private func delete(_ offsets: IndexSet) {
         withAnimation {
-            for index in offsets { modelContext.delete(applications[index]) }
+            for index in offsets { modelContext.delete(filteredApplications[index]) }
         }
     }
 
