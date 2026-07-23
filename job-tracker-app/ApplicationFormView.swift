@@ -24,6 +24,7 @@ struct ApplicationFormView: View {
     @State private var jobURL: String
 
     @StateObject private var searchVM = CompanySearchViewModel()
+    @StateObject private var jobTitleVM = JobTitleSuggestionViewModel()
 //    @State private var showSuggestions: Bool = true  // Removed as per instruction
     @State private var suppressSuggestionRefresh: Bool = false
 
@@ -202,11 +203,28 @@ struct ApplicationFormView: View {
                         .focused($focusedField, equals: .position)
                         .padding(.vertical, 2)
                         .modifier(ValidationModifier(isInvalid: positionInvalid))
-                        .onSubmit {
-                            goNext()
+                        .onChange(of: position) { newValue in
+                            jobTitleVM.query = newValue
                         }
+                        .onChange(of: focusedField) { newValue in
+                            if newValue == .position {
+                                jobTitleVM.refreshSuggestions()
+                            } else {
+                                jobTitleVM.clearSuggestions()
+                            }
+                        }
+                        .onSubmit {
+                            acceptJobTitleSuggestionOrAdvance()
+                        }
+
                     if positionInvalid {
                         InlineErrorText("Position is required.")
+                    }
+
+                    if focusedField == .position {
+                        JobTitleSuggestionsView(suggestions: jobTitleVM.suggestions) { suggestion in
+                            selectJobTitle(suggestion)
+                        }
                     }
                 }
             }
@@ -365,6 +383,23 @@ struct ApplicationFormView: View {
         } else {
             focusedField = .position
         }
+    }
+
+    private func acceptJobTitleSuggestionOrAdvance() {
+        let typed = position.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let firstSuggestion = jobTitleVM.suggestions.first,
+           !typed.isEmpty,
+           firstSuggestion.title.lowercased().hasPrefix(typed.lowercased()) {
+            selectJobTitle(firstSuggestion)
+        } else {
+            goNext()
+        }
+    }
+
+    private func selectJobTitle(_ suggestion: StandardJobTitle) {
+        position = suggestion.title
+        jobTitleVM.clearSuggestions()
+        focusedField = nil
     }
 
     private var stepTransition: AnyTransition {
