@@ -27,6 +27,7 @@ struct ApplicationFormView: View {
     @StateObject private var jobTitleVM = JobTitleSuggestionViewModel()
 //    @State private var showSuggestions: Bool = true  // Removed as per instruction
     @State private var suppressSuggestionRefresh: Bool = false
+    @State private var suppressJobTitleSuggestionRefresh: Bool = false
 
     var onSave: (JobApplication) -> Void
     var onCancel: () -> Void
@@ -107,6 +108,7 @@ struct ApplicationFormView: View {
         .presentationDragIndicator(.visible)
         .onAppear { updateDetentForStep() }
         .onChange(of: step) { _ in updateDetentForStep() }
+        .onChange(of: jobTitleVM.suggestions) { updateDetentForStep() }
     }
 
     private var stepHeader: some View {
@@ -204,6 +206,10 @@ struct ApplicationFormView: View {
                         .padding(.vertical, 2)
                         .modifier(ValidationModifier(isInvalid: positionInvalid))
                         .onChange(of: position) { newValue in
+                            if suppressJobTitleSuggestionRefresh {
+                                suppressJobTitleSuggestionRefresh = false
+                                return
+                            }
                             jobTitleVM.query = newValue
                         }
                         .onChange(of: focusedField) { newValue in
@@ -397,9 +403,11 @@ struct ApplicationFormView: View {
     }
 
     private func selectJobTitle(_ suggestion: StandardJobTitle) {
+        suppressJobTitleSuggestionRefresh = true
         position = suggestion.title
         jobTitleVM.clearSuggestions()
         focusedField = nil
+        updateDetentForStep()
     }
 
     private var stepTransition: AnyTransition {
@@ -420,9 +428,13 @@ struct ApplicationFormView: View {
         }
     }
 
+    private var shouldExpandForJobTitleSuggestions: Bool {
+        step == .basics && focusedField == .position && !jobTitleVM.suggestions.isEmpty
+    }
+
     private func updateDetentForStep() {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
-            selectedDetent = (step == .basics) ? .medium : .large
+            selectedDetent = (step == .basics && !shouldExpandForJobTitleSuggestions) ? .medium : .large
         }
     }
 
