@@ -368,22 +368,23 @@ struct ContentView: View {
 
             if isEditing {
                 ForEach(filteredApplications) { app in
-                    KanbanRow(app: app)
+                    applicationRow(for: app, mode: mode)
                         .tag(app.id)
                         .contextMenu {
                             Button(role: .destructive) { delete(app) } label: {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
+                        .listRowInsets(rowInsets(for: mode))
                 }
             } else {
                 ForEach(filteredApplications) { app in
                     Button {
                         select(app, mode: mode)
                     } label: {
-                        KanbanRow(app: app)
+                        applicationRow(for: app, mode: mode)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                RoundedRectangle(cornerRadius: rowCornerRadius(for: mode), style: .continuous)
                                     .stroke(selectionColor(for: app, mode: mode), lineWidth: 2)
                             )
                     }
@@ -393,6 +394,7 @@ struct ContentView: View {
                             Label("Delete", systemImage: "trash")
                         }
                     }
+                    .listRowInsets(rowInsets(for: mode))
                 }
                 .onDelete(perform: delete)
             }
@@ -401,6 +403,28 @@ struct ContentView: View {
         .listRowSeparator(.hidden)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic))
         .deleteDisabled(isEditing)
+    }
+
+    private func applicationRow(for app: JobApplication, mode: ApplicationListMode) -> some View {
+        KanbanRow(app: app, style: mode == .landscapeSelection ? .compact : .standard)
+    }
+
+    private func rowInsets(for mode: ApplicationListMode) -> EdgeInsets {
+        switch mode {
+        case .navigationStack:
+            EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
+        case .landscapeSelection:
+            EdgeInsets(top: 1, leading: 10, bottom: 1, trailing: 10)
+        }
+    }
+
+    private func rowCornerRadius(for mode: ApplicationListMode) -> CGFloat {
+        switch mode {
+        case .navigationStack:
+            12
+        case .landscapeSelection:
+            8
+        }
     }
 
     @ViewBuilder
