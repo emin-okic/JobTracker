@@ -276,14 +276,11 @@ struct ContentView: View {
     }
 
     private var landscapeSummaryHeader: some View {
-        VStack(spacing: 12) {
-            progressCards
-
-            HStack(spacing: 8) {
-                Image(systemName: "rectangle.split.2x1")
-                    .foregroundStyle(.blue)
-                Text("Landscape review")
-                    .font(.subheadline.weight(.semibold))
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Label("Job Search Pipeline", systemImage: "rectangle.split.2x1")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Text("\(filteredApplications.count)")
                     .font(.caption.weight(.semibold))
@@ -295,10 +292,59 @@ struct ContentView: View {
                             .fill(Color.secondary.opacity(0.12))
                     )
             }
-            .padding(.horizontal)
-            .padding(.bottom, 4)
+
+            HStack(spacing: 8) {
+                compactProgressCard(for: .today, count: todaysApplications.count)
+                compactProgressCard(for: .week, count: weeklyApplications.count)
+            }
         }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
         .background(Color(.systemGroupedBackground))
+    }
+
+    private func compactProgressCard(for range: ApplicationProgressRange, count: Int) -> some View {
+        let isSelected = selectedProgressRange == range
+
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                selectedProgressRange = range
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: range.systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .symbolRenderingMode(.hierarchical)
+
+                Text("\(count)")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.primary)
+
+                Text(range.cardTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? Color.blue.opacity(0.1) : Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? Color.blue.opacity(0.7) : Color.secondary.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(range.filterTitle), \(count) applications")
+        .accessibilityHint(isSelected ? "This filter is already active" : "Double tap to filter the job application list")
     }
 
     private func applicationList(mode: ApplicationListMode, includesOverview: Bool = false) -> some View {
