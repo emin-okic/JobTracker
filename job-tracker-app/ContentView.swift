@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var selectedProgressRange: ApplicationProgressRange?
     @State private var searchText = ""
     @State private var path: [UUID] = []
+    @State private var selectedApplicationID: UUID?
     @State private var selectedIDs: Set<UUID> = []
 
     private enum ApplicationProgressRange: String, Identifiable {
@@ -56,25 +57,50 @@ struct ContentView: View {
         }
     }
 
+    private enum ApplicationListMode {
+        case navigationStack
+        case landscapeSelection
+    }
+
     var body: some View {
+        GeometryReader { proxy in
+            if usesLandscapeSplit(for: proxy.size) {
+                landscapeSplitView
+            } else {
+                portraitNavigationView
+            }
+        }
+        .sheet(isPresented: $showingAddSheet) {
+            NavigationStack {
+                ApplicationFormView { newApp in
+                    modelContext.insert(newApp)
+                    showingAddSheet = false
+                } onCancel: {
+                    showingAddSheet = false
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .onChange(of: editMode) { _, newValue in
+            if newValue != .active { selectedIDs.removeAll() }
+        }
+        .onChange(of: applications.map(\.id)) { _, ids in
+            syncLandscapeSelection(with: ids)
+        }
+        .onChange(of: filteredApplications.map(\.id)) { _, ids in
+            syncLandscapeSelection(with: ids)
+        }
+        .environment(\.editMode, $editMode)
+    }
+
+    private var portraitNavigationView: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 progressCards
                 banner
-                list
+                applicationList(mode: .navigationStack)
             }
             .navigationTitle("Job Tracker")
-            .sheet(isPresented: $showingAddSheet) {
-                NavigationStack {
-                    ApplicationFormView { newApp in
-                        modelContext.insert(newApp)
-                        showingAddSheet = false
-                    } onCancel: {
-                        showingAddSheet = false
-                    }
-                }
-                .presentationDetents([.medium, .large])
-            }
             .navigationDestination(for: UUID.self) { id in
                 if let app = applications.first(where: { $0.id == id }) {
                     ApplicationDetailView(app: app)
@@ -85,11 +111,39 @@ struct ContentView: View {
             .overlay(alignment: .bottomLeading) {
                 floatingToolbar
             }
-            .onChange(of: editMode) { _, newValue in
-                if newValue != .active { selectedIDs.removeAll() }
-            }
-            .environment(\.editMode, $editMode)
         }
+    }
+
+    private var landscapeSplitView: some View {
+        HStack(spacing: 0) {
+            NavigationStack {
+                VStack(spacing: 0) {
+                    landscapeSummaryHeader
+                    applicationList(mode: .landscapeSelection)
+                }
+                .navigationTitle("Job Tracker")
+                .navigationBarTitleDisplayMode(.inline)
+                .overlay(alignment: .bottomLeading) {
+                    floatingToolbar
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            Divider()
+
+            NavigationStack {
+                landscapeDetailPane
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .background(Color(.systemGroupedBackground))
+        .onAppear {
+            selectDefaultApplicationIfNeeded()
+        }
+    }
+
+    private func usesLandscapeSplit(for size: CGSize) -> Bool {
+        size.width > size.height && size.width >= 640
     }
 
     private var progressCards: some View {
@@ -162,7 +216,33 @@ struct ContentView: View {
         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
     }
 
-    private var list: some View {
+    private var landscapeSummaryHeader: some View {
+        VStack(spacing: 12) {
+            progressCards
+
+            HStack(spacing: 8) {
+                Image(systemName: "rectangle.split.2x1")
+                    .foregroundStyle(.blue)
+                Text("Landscape review")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Text("\(filteredApplications.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.secondary.opacity(0.12))
+                    )
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 4)
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private func applicationList(mode: ApplicationListMode) -> some View {
         List(selection: $selectedIDs) {
             if let selectedProgressRange {
                 activeFilterRow(for: selectedProgressRange)
@@ -182,9 +262,13 @@ struct ContentView: View {
             } else {
                 ForEach(filteredApplications) { app in
                     Button {
-                        path.append(app.id)
+                        select(app, mode: mode)
                     } label: {
                         KanbanRow(app: app)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(selectionColor(for: app, mode: mode), lineWidth: 2)
+                            )
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
@@ -200,6 +284,21 @@ struct ContentView: View {
         .listRowSeparator(.hidden)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic))
         .deleteDisabled(isEditing)
+    }
+
+    @ViewBuilder
+    private var landscapeDetailPane: some View {
+        if let selectedApplication {
+            ApplicationDetailView(app: selectedApplication)
+        } else {
+            ContentUnavailableView(
+                "Select an application",
+                systemImage: "rectangle.split.2x1",
+                description: Text("Choose a job application from the list to review its details.")
+            )
+            .navigationTitle("Details")
+            .navigationBarTitleDisplayMode(.inline)
+        }
     }
 
     private func activeFilterRow(for range: ApplicationProgressRange) -> some View {
@@ -238,6 +337,38 @@ struct ContentView: View {
             app.position.lowercased().contains(query) ||
             app.status.lowercased().contains(query)
         }
+    }
+
+    private var selectedApplication: JobApplication? {
+        guard let selectedApplicationID else { return nil }
+        return applications.first { $0.id == selectedApplicationID }
+    }
+
+    private func select(_ app: JobApplication, mode: ApplicationListMode) {
+        switch mode {
+        case .navigationStack:
+            path.append(app.id)
+        case .landscapeSelection:
+            selectedApplicationID = app.id
+        }
+    }
+
+    private func selectionColor(for app: JobApplication, mode: ApplicationListMode) -> Color {
+        guard mode == .landscapeSelection, selectedApplicationID == app.id else {
+            return .clear
+        }
+        return .blue.opacity(0.65)
+    }
+
+    private func selectDefaultApplicationIfNeeded() {
+        syncLandscapeSelection(with: filteredApplications.map(\.id))
+    }
+
+    private func syncLandscapeSelection(with ids: [UUID]) {
+        if let selectedApplicationID, ids.contains(selectedApplicationID) {
+            return
+        }
+        selectedApplicationID = ids.first
     }
 
     private var todaysApplications: [JobApplication] {
