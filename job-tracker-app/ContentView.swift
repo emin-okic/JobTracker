@@ -22,6 +22,9 @@ struct ContentView: View {
     @State private var path: [UUID] = []
     @State private var selectedApplicationID: UUID?
     @State private var selectedIDs: Set<UUID> = []
+    @State private var landscapeDetailFraction: CGFloat = 0.5
+    @State private var landscapeDragStartFraction: CGFloat?
+    @State private var isLandscapeDetailClosed = false
 
     private enum ApplicationProgressRange: String, Identifiable {
         case today
@@ -111,28 +114,40 @@ struct ContentView: View {
     }
 
     private var landscapeSplitView: some View {
-        HStack(spacing: 0) {
-            NavigationStack {
-                VStack(spacing: 0) {
-                    landscapeSummaryHeader
-                    applicationList(mode: .landscapeSelection)
+        GeometryReader { proxy in
+            let handleWidth: CGFloat = 22
+            let availableWidth = max(proxy.size.width - handleWidth, 1)
+            let detailWidth = landscapeDetailWidth(for: availableWidth)
+            let listWidth = availableWidth - detailWidth
+
+            HStack(spacing: 0) {
+                NavigationStack {
+                    VStack(spacing: 0) {
+                        landscapeSummaryHeader
+                        applicationList(mode: .landscapeSelection)
+                    }
+                    .navigationTitle("Job Tracker")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .overlay(alignment: .bottomLeading) {
+                        floatingToolbar
+                    }
                 }
-                .navigationTitle("Job Tracker")
-                .navigationBarTitleDisplayMode(.inline)
-                .overlay(alignment: .bottomLeading) {
-                    floatingToolbar
+                .frame(width: selectedApplication == nil ? proxy.size.width : listWidth)
+
+                if selectedApplication != nil {
+                    landscapeResizeHandle(availableWidth: availableWidth)
+                        .frame(width: handleWidth)
+
+                    NavigationStack {
+                        landscapeDetailPane
+                    }
+                    .frame(width: detailWidth)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
-            .frame(maxWidth: .infinity)
-
-            Divider()
-
-            NavigationStack {
-                landscapeDetailPane
-            }
-            .frame(maxWidth: .infinity)
+            .background(Color(.systemGroupedBackground))
+            .animation(.spring(response: 0.32, dampingFraction: 0.9), value: selectedApplicationID)
         }
-        .background(Color(.systemGroupedBackground))
         .onAppear {
             selectDefaultApplicationIfNeeded()
         }
@@ -140,6 +155,52 @@ struct ContentView: View {
 
     private func usesLandscapeSplit(for size: CGSize) -> Bool {
         size.width > size.height && size.width >= 640
+    }
+
+    private func landscapeDetailWidth(for availableWidth: CGFloat) -> CGFloat {
+        let minimumListWidth: CGFloat = 300
+        let minimumDetailWidth: CGFloat = 340
+        let lowerBound = min(minimumDetailWidth, availableWidth)
+        let upperBound = max(lowerBound, availableWidth - minimumListWidth)
+        let proposedWidth = availableWidth * landscapeDetailFraction
+        return min(max(proposedWidth, lowerBound), upperBound)
+    }
+
+    private func updateLandscapeDetailWidth(availableWidth: CGFloat, translation: CGFloat) {
+        let startFraction = landscapeDragStartFraction ?? landscapeDetailFraction
+        landscapeDragStartFraction = startFraction
+
+        let proposedWidth = availableWidth * startFraction - translation
+        let minimumListWidth: CGFloat = 300
+        let minimumDetailWidth: CGFloat = 340
+        let lowerBound = min(minimumDetailWidth, availableWidth)
+        let upperBound = max(lowerBound, availableWidth - minimumListWidth)
+        let clampedWidth = min(max(proposedWidth, lowerBound), upperBound)
+        landscapeDetailFraction = clampedWidth / availableWidth
+    }
+
+    private func landscapeResizeHandle(availableWidth: CGFloat) -> some View {
+        Rectangle()
+            .fill(Color(.separator).opacity(0.55))
+            .frame(width: 1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.secondary.opacity(0.45))
+                    .frame(width: 4, height: 48)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        updateLandscapeDetailWidth(availableWidth: availableWidth, translation: value.translation.width)
+                    }
+                    .onEnded { _ in
+                        landscapeDragStartFraction = nil
+                    }
+            )
+            .accessibilityLabel("Resize details pane")
+            .accessibilityHint("Drag left or right to resize the job application details screen")
     }
 
     private var progressCards: some View {
@@ -298,6 +359,20 @@ struct ContentView: View {
     private var landscapeDetailPane: some View {
         if let selectedApplication {
             ApplicationDetailView(app: selectedApplication)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            closeLandscapeDetail()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title3)
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Close Details")
+                    }
+                }
         } else {
             ContentUnavailableView(
                 "Select an application",
@@ -357,6 +432,7 @@ struct ContentView: View {
         case .navigationStack:
             path.append(app.id)
         case .landscapeSelection:
+            isLandscapeDetailClosed = false
             selectedApplicationID = app.id
         }
     }
@@ -373,10 +449,17 @@ struct ContentView: View {
     }
 
     private func syncLandscapeSelection(with ids: [UUID]) {
+        guard !isLandscapeDetailClosed else { return }
+
         if let selectedApplicationID, ids.contains(selectedApplicationID) {
             return
         }
         selectedApplicationID = ids.first
+    }
+
+    private func closeLandscapeDetail() {
+        isLandscapeDetailClosed = true
+        selectedApplicationID = nil
     }
 
     private var todaysApplications: [JobApplication] {
