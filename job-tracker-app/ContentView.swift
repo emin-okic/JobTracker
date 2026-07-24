@@ -95,11 +95,7 @@ struct ContentView: View {
 
     private var portraitNavigationView: some View {
         NavigationStack(path: $path) {
-            VStack(spacing: 0) {
-                progressCards
-                banner
-                applicationList(mode: .navigationStack)
-            }
+            applicationList(mode: .navigationStack, includesOverview: true)
             .navigationTitle("Job Tracker")
             .navigationDestination(for: UUID.self) { id in
                 if let app = applications.first(where: { $0.id == id }) {
@@ -242,8 +238,20 @@ struct ContentView: View {
         .background(Color(.systemGroupedBackground))
     }
 
-    private func applicationList(mode: ApplicationListMode) -> some View {
+    private func applicationList(mode: ApplicationListMode, includesOverview: Bool = false) -> some View {
         List(selection: $selectedIDs) {
+            if includesOverview {
+                progressCards
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+
+                banner
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+
             if let selectedProgressRange {
                 activeFilterRow(for: selectedProgressRange)
                     .listRowSeparator(.hidden)
