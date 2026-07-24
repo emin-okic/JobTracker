@@ -20,7 +20,11 @@ struct ContentView: View {
     @State private var selectedProgressRange: ApplicationProgressRange?
     @State private var searchText = ""
     @State private var path: [UUID] = []
+    @State private var selectedApplicationID: UUID?
     @State private var selectedIDs: Set<UUID> = []
+    @State private var landscapeDetailFraction: CGFloat = 0.5
+    @State private var landscapeDragStartFraction: CGFloat?
+    @State private var isLandscapeDetailClosed = false
 
     private enum ApplicationProgressRange: String, Identifiable {
         case today
@@ -56,40 +60,72 @@ struct ContentView: View {
         }
     }
 
+    private enum ApplicationListMode {
+        case navigationStack
+        case landscapeSelection
+    }
+
     var body: some View {
-        NavigationStack(path: $path) {
-            VStack(spacing: 0) {
-                progressCards
-                banner
-                list
+        GeometryReader { proxy in
+            if usesLandscapeSplit(for: proxy.size) {
+                landscapeSplitView
+            } else {
+                portraitNavigationView
             }
-            .navigationTitle("Job Tracker")
-            .sheet(isPresented: $showingAddSheet) {
-                NavigationStack {
-                    ApplicationFormView { newApp in
-                        modelContext.insert(newApp)
-                        showingAddSheet = false
-                    } onCancel: {
-                        showingAddSheet = false
-                    }
-                }
-                .presentationDetents([.medium, .large])
-            }
-            .navigationDestination(for: UUID.self) { id in
-                if let app = applications.first(where: { $0.id == id }) {
-                    ApplicationDetailView(app: app)
-                } else {
-                    Text("Application not found")
-                }
-            }
-            .overlay(alignment: .bottomLeading) {
-                floatingToolbar
-            }
-            .onChange(of: editMode) { _, newValue in
-                if newValue != .active { selectedIDs.removeAll() }
-            }
-            .environment(\.editMode, $editMode)
         }
+        .sheet(isPresented: $showingAddSheet) {
+            NavigationStack {
+                ApplicationFormView { newApp in
+                    modelContext.insert(newApp)
+                    showingAddSheet = false
+                } onCancel: {
+                    showingAddSheet = false
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .onChange(of: editMode) { _, newValue in
+            if newValue != .active { selectedIDs.removeAll() }
+        }
+        .onChange(of: applications.map(\.id)) { _, ids in
+            syncLandscapeSelection(with: ids)
+        }
+        .onChange(of: filteredApplications.map(\.id)) { _, ids in
+            syncLandscapeSelection(with: ids)
+        }
+        .environment(\.editMode, $editMode)
+    }
+
+    private var portraitNavigationView: some View {
+        JobTrackerPortraitView(path: $path, applications: applications) {
+            applicationList(mode: .navigationStack, includesOverview: true)
+        } toolbarContent: {
+            floatingToolbar
+        }
+    }
+
+    private var landscapeSplitView: some View {
+        JobTrackerLandscapeSplitView(
+            detailFraction: $landscapeDetailFraction,
+            dragStartFraction: $landscapeDragStartFraction,
+            selectedApplication: selectedApplication
+        ) {
+            VStack(spacing: 0) {
+                landscapeSummaryHeader
+                applicationList(mode: .landscapeSelection)
+            }
+        } detailContent: {
+            landscapeDetailPane
+        } toolbarContent: {
+            floatingToolbar
+        }
+        .onAppear {
+            selectDefaultApplicationIfNeeded()
+        }
+    }
+
+    private func usesLandscapeSplit(for size: CGSize) -> Bool {
+        size.width > size.height && size.width >= 640
     }
 
     private var progressCards: some View {
@@ -162,8 +198,92 @@ struct ContentView: View {
         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
     }
 
-    private var list: some View {
+    private var landscapeSummaryHeader: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Label("Job Search Pipeline", systemImage: "rectangle.split.2x1")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text("\(filteredApplications.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.secondary.opacity(0.12))
+                    )
+            }
+
+            HStack(spacing: 8) {
+                compactProgressCard(for: .today, count: todaysApplications.count)
+                compactProgressCard(for: .week, count: weeklyApplications.count)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private func compactProgressCard(for range: ApplicationProgressRange, count: Int) -> some View {
+        let isSelected = selectedProgressRange == range
+
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                selectedProgressRange = range
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: range.systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .symbolRenderingMode(.hierarchical)
+
+                Text("\(count)")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(.primary)
+
+                Text(range.cardTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? Color.blue.opacity(0.1) : Color(.secondarySystemGroupedBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? Color.blue.opacity(0.7) : Color.secondary.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(range.filterTitle), \(count) applications")
+        .accessibilityHint(isSelected ? "This filter is already active" : "Double tap to filter the job application list")
+    }
+
+    private func applicationList(mode: ApplicationListMode, includesOverview: Bool = false) -> some View {
         List(selection: $selectedIDs) {
+            if includesOverview {
+                progressCards
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+
+                banner
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+
             if let selectedProgressRange {
                 activeFilterRow(for: selectedProgressRange)
                     .listRowSeparator(.hidden)
@@ -171,20 +291,25 @@ struct ContentView: View {
 
             if isEditing {
                 ForEach(filteredApplications) { app in
-                    KanbanRow(app: app)
+                    applicationRow(for: app, mode: mode)
                         .tag(app.id)
                         .contextMenu {
                             Button(role: .destructive) { delete(app) } label: {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
+                        .listRowInsets(rowInsets(for: mode))
                 }
             } else {
                 ForEach(filteredApplications) { app in
                     Button {
-                        path.append(app.id)
+                        select(app, mode: mode)
                     } label: {
-                        KanbanRow(app: app)
+                        applicationRow(for: app, mode: mode)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: rowCornerRadius(for: mode), style: .continuous)
+                                    .stroke(selectionColor(for: app, mode: mode), lineWidth: 2)
+                            )
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
@@ -192,6 +317,7 @@ struct ContentView: View {
                             Label("Delete", systemImage: "trash")
                         }
                     }
+                    .listRowInsets(rowInsets(for: mode))
                 }
                 .onDelete(perform: delete)
             }
@@ -200,6 +326,57 @@ struct ContentView: View {
         .listRowSeparator(.hidden)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic))
         .deleteDisabled(isEditing)
+    }
+
+    private func applicationRow(for app: JobApplication, mode: ApplicationListMode) -> some View {
+        KanbanRow(app: app, style: mode == .landscapeSelection ? .compact : .standard)
+    }
+
+    private func rowInsets(for mode: ApplicationListMode) -> EdgeInsets {
+        switch mode {
+        case .navigationStack:
+            EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
+        case .landscapeSelection:
+            EdgeInsets(top: 1, leading: 10, bottom: 1, trailing: 10)
+        }
+    }
+
+    private func rowCornerRadius(for mode: ApplicationListMode) -> CGFloat {
+        switch mode {
+        case .navigationStack:
+            12
+        case .landscapeSelection:
+            8
+        }
+    }
+
+    @ViewBuilder
+    private var landscapeDetailPane: some View {
+        if let selectedApplication {
+            ApplicationDetailView(app: selectedApplication)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            closeLandscapeDetail()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title3)
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Close Details")
+                    }
+                }
+        } else {
+            ContentUnavailableView(
+                "Select an application",
+                systemImage: "rectangle.split.2x1",
+                description: Text("Choose a job application from the list to review its details.")
+            )
+            .navigationTitle("Details")
+            .navigationBarTitleDisplayMode(.inline)
+        }
     }
 
     private func activeFilterRow(for range: ApplicationProgressRange) -> some View {
@@ -238,6 +415,46 @@ struct ContentView: View {
             app.position.lowercased().contains(query) ||
             app.status.lowercased().contains(query)
         }
+    }
+
+    private var selectedApplication: JobApplication? {
+        guard let selectedApplicationID else { return nil }
+        return applications.first { $0.id == selectedApplicationID }
+    }
+
+    private func select(_ app: JobApplication, mode: ApplicationListMode) {
+        switch mode {
+        case .navigationStack:
+            path.append(app.id)
+        case .landscapeSelection:
+            isLandscapeDetailClosed = false
+            selectedApplicationID = app.id
+        }
+    }
+
+    private func selectionColor(for app: JobApplication, mode: ApplicationListMode) -> Color {
+        guard mode == .landscapeSelection, selectedApplicationID == app.id else {
+            return .clear
+        }
+        return .blue.opacity(0.65)
+    }
+
+    private func selectDefaultApplicationIfNeeded() {
+        syncLandscapeSelection(with: filteredApplications.map(\.id))
+    }
+
+    private func syncLandscapeSelection(with ids: [UUID]) {
+        guard !isLandscapeDetailClosed else { return }
+
+        if let selectedApplicationID, ids.contains(selectedApplicationID) {
+            return
+        }
+        selectedApplicationID = ids.first
+    }
+
+    private func closeLandscapeDetail() {
+        isLandscapeDetailClosed = true
+        selectedApplicationID = nil
     }
 
     private var todaysApplications: [JobApplication] {
