@@ -129,7 +129,9 @@ struct ContentView: View {
                     .navigationTitle("Job Tracker")
                     .navigationBarTitleDisplayMode(.inline)
                     .overlay(alignment: .bottomLeading) {
-                        floatingToolbar
+                        if selectedApplication == nil {
+                            floatingToolbar
+                        }
                     }
                 }
                 .frame(width: selectedApplication == nil ? proxy.size.width : listWidth)
