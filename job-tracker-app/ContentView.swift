@@ -287,6 +287,9 @@ struct ContentView: View {
             if let selectedProgressRange {
                 activeFilterRow(for: selectedProgressRange)
                     .listRowSeparator(.hidden)
+            } else if includesOverview {
+                allApplicationsRow
+                    .listRowSeparator(.hidden)
             }
 
             if isEditing {
@@ -432,6 +435,28 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.blue)
             .accessibilityIdentifier("clearApplicationProgressFilterButton")
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 8)
+    }
+
+    private var allApplicationsRow: some View {
+        HStack(spacing: 10) {
+            Label("All Job Apps", systemImage: "tray.full")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Text("\(filteredApplications.count)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.secondary.opacity(0.12))
+                )
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 8)
