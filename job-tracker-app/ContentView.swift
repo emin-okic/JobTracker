@@ -287,18 +287,26 @@ struct ContentView: View {
             if let selectedProgressRange {
                 activeFilterRow(for: selectedProgressRange)
                     .listRowSeparator(.hidden)
+            } else if includesOverview {
+                allApplicationsRow
+                    .listRowSeparator(.hidden)
             }
 
             if isEditing {
                 ForEach(filteredApplications) { app in
-                    applicationRow(for: app, mode: mode)
-                        .tag(app.id)
-                        .contextMenu {
-                            Button(role: .destructive) { delete(app) } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                    Button {
+                        toggleSelection(for: app)
+                    } label: {
+                        editableApplicationRow(for: app, mode: mode)
+                    }
+                    .buttonStyle(.plain)
+                    .tag(app.id)
+                    .contextMenu {
+                        Button(role: .destructive) { delete(app) } label: {
+                            Label("Delete", systemImage: "trash")
                         }
-                        .listRowInsets(rowInsets(for: mode))
+                    }
+                    .listRowInsets(rowInsets(for: mode))
                 }
             } else {
                 ForEach(filteredApplications) { app in
@@ -330,6 +338,35 @@ struct ContentView: View {
 
     private func applicationRow(for app: JobApplication, mode: ApplicationListMode) -> some View {
         KanbanRow(app: app, style: mode == .landscapeSelection ? .compact : .standard)
+    }
+
+    private func editableApplicationRow(for app: JobApplication, mode: ApplicationListMode) -> some View {
+        HStack(spacing: mode == .landscapeSelection ? 8 : 12) {
+            selectionIndicator(isSelected: selectedIDs.contains(app.id))
+
+            applicationRow(for: app, mode: mode)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selectedIDs.contains(app.id) ? .isSelected : [])
+    }
+
+    private func selectionIndicator(isSelected: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(isSelected ? Color.blue : Color(.systemBackground))
+
+            Circle()
+                .stroke(isSelected ? Color.blue : Color.secondary.opacity(0.5), lineWidth: 2)
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(width: 24, height: 24)
+        .accessibilityHidden(true)
     }
 
     private func rowInsets(for mode: ApplicationListMode) -> EdgeInsets {
@@ -398,6 +435,28 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.blue)
             .accessibilityIdentifier("clearApplicationProgressFilterButton")
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 8)
+    }
+
+    private var allApplicationsRow: some View {
+        HStack(spacing: 10) {
+            Label("All Job Apps", systemImage: "tray.full")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Text("\(filteredApplications.count)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.secondary.opacity(0.12))
+                )
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 8)
@@ -485,6 +544,16 @@ struct ContentView: View {
 
     private func delete(_ app: JobApplication) {
         withAnimation { modelContext.delete(app) }
+    }
+
+    private func toggleSelection(for app: JobApplication) {
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.9)) {
+            if selectedIDs.contains(app.id) {
+                selectedIDs.remove(app.id)
+            } else {
+                selectedIDs.insert(app.id)
+            }
+        }
     }
 
     private func deleteSelected() {
