@@ -30,19 +30,19 @@
 
 /* Begin PBXFileReference section */
 		C5EAB2FE300B91F900C10A45 /* Job Search CRM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Job Search CRM.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		C5EAB30F300B91FA00C10A45 /* job-tracker-appTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "job-tracker-appTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		C5EAB319300B91FA00C10A45 /* job-tracker-appUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "job-tracker-appUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C5EAB30F300B91FA00C10A45 /* job-search-crmTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "job-search-crmTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C5EAB319300B91FA00C10A45 /* job-search-crmUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "job-search-crmUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C5F5B54830115AB9009688FB /* NotesEditingPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesEditingPolicy.swift; sourceTree = "<group>"; };
 		C5F5B54A30115ABF009688FB /* ApplicationDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationDetailViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		C5EAB321300B91FA00C10A45 /* Exceptions for "job-tracker-app" folder in "job-tracker-app" target */ = {
+		C5EAB321300B91FA00C10A45 /* Exceptions for "job-tracker-app" folder in "job-search-crm" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = C5EAB2FD300B91F900C10A45 /* job-tracker-app */;
+			target = C5EAB2FD300B91F900C10A45 /* job-search-crm */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -50,7 +50,7 @@
 		C5EAB300300B91F900C10A45 /* job-tracker-app */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				C5EAB321300B91FA00C10A45 /* Exceptions for "job-tracker-app" folder in "job-tracker-app" target */,
+				C5EAB321300B91FA00C10A45 /* Exceptions for "job-tracker-app" folder in "job-search-crm" target */,
 			);
 			path = "job-tracker-app";
 			sourceTree = "<group>";
@@ -108,8 +108,8 @@
 			isa = PBXGroup;
 			children = (
 				C5EAB2FE300B91F900C10A45 /* Job Search CRM.app */,
-				C5EAB30F300B91FA00C10A45 /* job-tracker-appTests.xctest */,
-				C5EAB319300B91FA00C10A45 /* job-tracker-appUITests.xctest */,
+				C5EAB30F300B91FA00C10A45 /* job-search-crmTests.xctest */,
+				C5EAB319300B91FA00C10A45 /* job-search-crmUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -117,9 +117,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		C5EAB2FD300B91F900C10A45 /* job-tracker-app */ = {
+		C5EAB2FD300B91F900C10A45 /* job-search-crm */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C5EAB322300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-tracker-app" */;
+			buildConfigurationList = C5EAB322300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-search-crm" */;
 			buildPhases = (
 				C5EAB2FA300B91F900C10A45 /* Sources */,
 				C5EAB2FB300B91F900C10A45 /* Frameworks */,
@@ -132,16 +132,16 @@
 			fileSystemSynchronizedGroups = (
 				C5EAB300300B91F900C10A45 /* job-tracker-app */,
 			);
-			name = "job-tracker-app";
+			name = "job-search-crm";
 			packageProductDependencies = (
 			);
 			productName = "job-tracker-app";
 			productReference = C5EAB2FE300B91F900C10A45 /* Job Search CRM.app */;
 			productType = "com.apple.product-type.application";
 		};
-		C5EAB30E300B91FA00C10A45 /* job-tracker-appTests */ = {
+		C5EAB30E300B91FA00C10A45 /* job-search-crmTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C5EAB327300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-tracker-appTests" */;
+			buildConfigurationList = C5EAB327300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-search-crmTests" */;
 			buildPhases = (
 				C5EAB30B300B91FA00C10A45 /* Sources */,
 				C5EAB30C300B91FA00C10A45 /* Frameworks */,
@@ -155,16 +155,16 @@
 			fileSystemSynchronizedGroups = (
 				C5EAB312300B91FA00C10A45 /* job-tracker-appTests */,
 			);
-			name = "job-tracker-appTests";
+			name = "job-search-crmTests";
 			packageProductDependencies = (
 			);
 			productName = "job-tracker-appTests";
-			productReference = C5EAB30F300B91FA00C10A45 /* job-tracker-appTests.xctest */;
+			productReference = C5EAB30F300B91FA00C10A45 /* job-search-crmTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		C5EAB318300B91FA00C10A45 /* job-tracker-appUITests */ = {
+		C5EAB318300B91FA00C10A45 /* job-search-crmUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C5EAB32A300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-tracker-appUITests" */;
+			buildConfigurationList = C5EAB32A300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-search-crmUITests" */;
 			buildPhases = (
 				C5EAB315300B91FA00C10A45 /* Sources */,
 				C5EAB316300B91FA00C10A45 /* Frameworks */,
@@ -178,11 +178,11 @@
 			fileSystemSynchronizedGroups = (
 				C5EAB31C300B91FA00C10A45 /* job-tracker-appUITests */,
 			);
-			name = "job-tracker-appUITests";
+			name = "job-search-crmUITests";
 			packageProductDependencies = (
 			);
 			productName = "job-tracker-appUITests";
-			productReference = C5EAB319300B91FA00C10A45 /* job-tracker-appUITests.xctest */;
+			productReference = C5EAB319300B91FA00C10A45 /* job-search-crmUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -208,7 +208,7 @@
 					};
 				};
 			};
-			buildConfigurationList = C5EAB2F9300B91F900C10A45 /* Build configuration list for PBXProject "job-tracker-app" */;
+			buildConfigurationList = C5EAB2F9300B91F900C10A45 /* Build configuration list for PBXProject "job-search-crm" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -222,9 +222,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				C5EAB2FD300B91F900C10A45 /* job-tracker-app */,
-				C5EAB30E300B91FA00C10A45 /* job-tracker-appTests */,
-				C5EAB318300B91FA00C10A45 /* job-tracker-appUITests */,
+				C5EAB2FD300B91F900C10A45 /* job-search-crm */,
+				C5EAB30E300B91FA00C10A45 /* job-search-crmTests */,
+				C5EAB318300B91FA00C10A45 /* job-search-crmUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -282,12 +282,12 @@
 /* Begin PBXTargetDependency section */
 		C5EAB311300B91FA00C10A45 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = C5EAB2FD300B91F900C10A45 /* job-tracker-app */;
+			target = C5EAB2FD300B91F900C10A45 /* job-search-crm */;
 			targetProxy = C5EAB310300B91FA00C10A45 /* PBXContainerItemProxy */;
 		};
 		C5EAB31B300B91FA00C10A45 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = C5EAB2FD300B91F900C10A45 /* job-tracker-app */;
+			target = C5EAB2FD300B91F900C10A45 /* job-search-crm */;
 			targetProxy = C5EAB31A300B91FA00C10A45 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -315,7 +315,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "okic.job-tracker-app";
+				PRODUCT_BUNDLE_IDENTIFIER = "okic.job-search-crm";
 				PRODUCT_NAME = "Job Search CRM";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -353,7 +353,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "okic.job-tracker-app";
+				PRODUCT_BUNDLE_IDENTIFIER = "okic.job-search-crm";
 				PRODUCT_NAME = "Job Search CRM";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -512,7 +512,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/job-tracker-app.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/job-tracker-app";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/job-search-crm.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/job-search-crm";
 			};
 			name = Debug;
 		};
@@ -538,7 +538,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/job-tracker-app.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/job-tracker-app";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/job-search-crm.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/job-search-crm";
 			};
 			name = Release;
 		};
@@ -593,7 +593,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		C5EAB2F9300B91F900C10A45 /* Build configuration list for PBXProject "job-tracker-app" */ = {
+		C5EAB2F9300B91F900C10A45 /* Build configuration list for PBXProject "job-search-crm" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C5EAB325300B91FA00C10A45 /* Debug */,
@@ -602,7 +602,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C5EAB322300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-tracker-app" */ = {
+		C5EAB322300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-search-crm" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C5EAB323300B91FA00C10A45 /* Debug */,
@@ -611,7 +611,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C5EAB327300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-tracker-appTests" */ = {
+		C5EAB327300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-search-crmTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C5EAB328300B91FA00C10A45 /* Debug */,
@@ -620,7 +620,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C5EAB32A300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-tracker-appUITests" */ = {
+		C5EAB32A300B91FA00C10A45 /* Build configuration list for PBXNativeTarget "job-search-crmUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C5EAB32B300B91FA00C10A45 /* Debug */,
