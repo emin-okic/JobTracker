@@ -22,6 +22,7 @@ struct ApplicationFormView: View {
 
     @State private var companyURL: String
     @State private var jobURL: String
+    @State private var companyLogoURL: String
 
     @StateObject private var searchVM = CompanySearchViewModel()
     @StateObject private var jobTitleVM = JobTitleSuggestionViewModel()
@@ -52,6 +53,7 @@ struct ApplicationFormView: View {
         self.originalNotes = existing?.notes
         _companyURL = State(initialValue: existing?.companyURL ?? "")
         _jobURL = State(initialValue: existing?.jobURL ?? "")
+        _companyLogoURL = State(initialValue: existing?.companyLogoURL ?? "")
         self.notesPolicy = notesPolicy
         self.onSave = onSave
         self.onCancel = onCancel
@@ -163,6 +165,7 @@ struct ApplicationFormView: View {
                                     suppressSuggestionRefresh = false
                                     return
                                 }
+                                companyLogoURL = ""
                                 searchVM.query = newValue
                             }
                             .onSubmit {
@@ -382,6 +385,7 @@ struct ApplicationFormView: View {
             if !prediction.domain.isEmpty {
                 companyURL = "https://\(prediction.domain)"
             }
+            companyLogoURL = prediction.logo_url
             autofillCompanyAddress(name: prediction.name, domain: prediction.domain)
 //            showSuggestions = false  // Removed as per instructions
             searchVM.clearResults()
@@ -506,7 +510,8 @@ struct ApplicationFormView: View {
                                  location: location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : location,
                                  notes: notesPolicy.isEditable(existingNotes: originalNotes) ? (notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes) : originalNotes,
                                  companyURL: companyURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : companyURL,
-                                 jobURL: jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobURL)
+                                 jobURL: jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobURL,
+                                 companyLogoURL: companyLogoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : companyLogoURL)
         onSave(app)
         feedbackSuccess()
         dismiss()

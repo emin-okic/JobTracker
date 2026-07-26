@@ -100,34 +100,38 @@ struct ApplicationDetailView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            MonogramView(text: app.company)
-                .frame(width: 64, height: 64)
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: 14) {
+            CompanyLogoView(companyName: app.company, logoURL: app.companyLogoURL)
+                .frame(width: 58, height: 58)
+
+            VStack(alignment: .leading, spacing: 8) {
                 Text(app.position)
-                    .font(.title3).bold()
-                HStack(spacing: 6) {
-                    Image(systemName: "building.2")
-                    Text(app.company)
-                    if let location = app.location, !location.isEmpty {
-                        Text("•")
-                        Image(systemName: "mappin.and.ellipse")
-                        Text(location)
-                    }
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(app.company)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             StatusPill(status: app.status)
+                .padding(.top, 2)
         }
-        .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
         )
-        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.07), radius: 14, x: 0, y: 6)
     }
 
     private var quickActions: some View {
@@ -162,16 +166,8 @@ struct ApplicationDetailView: View {
 
     private var infoGrid: some View {
         VStack(spacing: 12) {
-            InfoCard(title: "Status", systemImage: "checkmark.seal.fill") {
-                Text(app.status)
-            }
-            HStack(spacing: 12) {
-                InfoCard(title: "Applied", systemImage: "calendar") {
-                    Text(app.dateApplied.formatted(date: .abbreviated, time: .omitted))
-                }
-                InfoCard(title: "Company", systemImage: "building.2") {
-                    Text(app.company)
-                }
+            InfoCard(title: "Applied", systemImage: "calendar") {
+                Text(app.dateApplied.formatted(date: .abbreviated, time: .omitted))
             }
             if let location = app.location, !location.isEmpty {
                 InfoCard(title: "Location", systemImage: "mappin.and.ellipse") {
@@ -363,5 +359,39 @@ struct ApplicationDetailView: View {
         generator.prepare()
         generator.notificationOccurred(.success)
         #endif
+    }
+}
+
+private struct CompanyLogoView: View {
+    let companyName: String
+    let logoURL: String?
+
+    var body: some View {
+        if let logoURL, let url = URL(string: logoURL) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .padding(8)
+                        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                        )
+                case .empty:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                case .failure:
+                    MonogramView(text: companyName)
+                @unknown default:
+                    MonogramView(text: companyName)
+                }
+            }
+        } else {
+            MonogramView(text: companyName)
+        }
     }
 }

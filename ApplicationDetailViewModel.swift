@@ -61,6 +61,7 @@ final class ApplicationDetailViewModel: ObservableObject {
         }
         app.companyURL = updated.companyURL
         app.jobURL = updated.jobURL
+        app.companyLogoURL = updated.companyLogoURL
         objectWillChange.send()
     }
 
