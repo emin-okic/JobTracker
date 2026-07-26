@@ -21,6 +21,7 @@ struct ApplicationEditFormView: View {
 
     @State private var companyURL: String
     @State private var jobURL: String
+    @State private var companyLogoURL: String
 
     private let originalNotes: String?
     private let existingID: UUID
@@ -50,6 +51,7 @@ struct ApplicationEditFormView: View {
         _location = State(initialValue: existing.location ?? "")
         _companyURL = State(initialValue: existing.companyURL ?? "")
         _jobURL = State(initialValue: existing.jobURL ?? "")
+        _companyLogoURL = State(initialValue: existing.companyLogoURL ?? "")
         self.originalNotes = existing.notes
         self.existingID = existing.id
         self.onSave = onSave
@@ -351,6 +353,7 @@ struct ApplicationEditFormView: View {
             if !prediction.domain.isEmpty {
                 companyURL = "https://\(prediction.domain)"
             }
+            companyLogoURL = prediction.logo_url
             autofillCompanyAddress(name: prediction.name, domain: prediction.domain)
             searchVM.clearResults()
             focusedField = .position
@@ -462,7 +465,8 @@ struct ApplicationEditFormView: View {
                                  location: location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : location,
                                  notes: originalNotes, // preserve existing notes; no editing in this form
                                  companyURL: companyURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : companyURL,
-                                 jobURL: jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobURL)
+                                 jobURL: jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobURL,
+                                 companyLogoURL: companyLogoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : companyLogoURL)
         onSave(app)
         feedbackSuccess()
         dismiss()

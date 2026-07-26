@@ -34,6 +34,7 @@ struct KanbanRow: View {
                 StatusPill(status: app.status)
             }
             HStack(spacing: 8) {
+                companyLogo(size: 26)
                 Label(app.company, systemImage: "building.2")
                 if let location = app.location, !location.isEmpty {
                     Text("•")
@@ -66,10 +67,13 @@ struct KanbanRow: View {
     private var compactBody: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(app.company)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(spacing: 7) {
+                    companyLogo(size: 24)
+                    Text(app.company)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
 
                 Label(app.dateApplied.formatted(date: .abbreviated, time: .omitted), systemImage: "paperplane")
                     .font(.caption)
@@ -95,5 +99,13 @@ struct KanbanRow: View {
         )
         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .padding(.vertical, 2)
+    }
+
+    @ViewBuilder
+    private func companyLogo(size: CGFloat) -> some View {
+        if let logoURL = app.companyLogoURL, !logoURL.isEmpty {
+            CompanyLogoView(urlString: logoURL)
+                .frame(width: size, height: size)
+        }
     }
 }

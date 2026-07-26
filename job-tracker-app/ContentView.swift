@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var editMode: EditMode = .inactive
 
     @State private var showingAddSheet = false
+    @State private var showingPipeline = false
     @State private var selectedProgressRange: ApplicationProgressRange?
     @State private var searchText = ""
     @State private var path: [UUID] = []
@@ -83,6 +84,10 @@ struct ContentView: View {
                 }
             }
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingPipeline) {
+            JobPipelineView(applications: applications)
+                .presentationDetents([.fraction(0.32), .medium, .large])
         }
         .onChange(of: editMode) { _, newValue in
             if newValue != .active { selectedIDs.removeAll() }
@@ -333,6 +338,21 @@ struct ContentView: View {
         .listStyle(.plain)
         .listRowSeparator(.hidden)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic))
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if !isEditing {
+                    Button {
+                        showingPipeline = true
+                    } label: {
+                        Image(systemName: "point.3.connected.trianglepath.dotted")
+                            .font(.system(size: 16, weight: .semibold))
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                    .accessibilityIdentifier("viewPipelineButton")
+                    .accessibilityLabel("View Job Search Pipeline")
+                }
+            }
+        }
         .deleteDisabled(isEditing)
     }
 
