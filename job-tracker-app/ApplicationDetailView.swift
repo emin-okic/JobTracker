@@ -101,7 +101,7 @@ struct ApplicationDetailView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
-            MonogramView(text: app.company)
+            CompanyLogoView(companyName: app.company, logoURL: app.companyLogoURL)
                 .frame(width: 64, height: 64)
             VStack(alignment: .leading, spacing: 6) {
                 Text(app.position)
@@ -363,5 +363,39 @@ struct ApplicationDetailView: View {
         generator.prepare()
         generator.notificationOccurred(.success)
         #endif
+    }
+}
+
+private struct CompanyLogoView: View {
+    let companyName: String
+    let logoURL: String?
+
+    var body: some View {
+        if let logoURL, let url = URL(string: logoURL) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .padding(8)
+                        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                        )
+                case .empty:
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                case .failure:
+                    MonogramView(text: companyName)
+                @unknown default:
+                    MonogramView(text: companyName)
+                }
+            }
+        } else {
+            MonogramView(text: companyName)
+        }
     }
 }
