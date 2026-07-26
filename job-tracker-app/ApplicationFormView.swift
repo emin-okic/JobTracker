@@ -122,7 +122,7 @@ struct ApplicationFormView: View {
                 Spacer(minLength: 8)
                 stepLabel(for: .details, title: "Details")
                 Spacer(minLength: 8)
-                stepLabel(for: .notes, title: "Notes")
+                stepLabel(for: .notes, title: "Activity")
                 Spacer(minLength: 8)
                 stepLabel(for: .review, title: "Confirm")
             }
@@ -274,9 +274,9 @@ struct ApplicationFormView: View {
 
     private var notesForm: some View {
         Form {
-            Section("Notes") {
+            Section("Initial Activity") {
                 if notesPolicy.isEditable(existingNotes: originalNotes) {
-                    TextField("Notes (optional)", text: $notes, axis: .vertical)
+                    TextField("Add initial note (optional)", text: $notes, axis: .vertical)
                         .lineLimit(4, reservesSpace: true)
                 } else {
                     Text(originalNotes ?? "")
@@ -307,7 +307,7 @@ struct ApplicationFormView: View {
                     LabeledContent("Location", value: location)
                 }
                 if !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    LabeledContent("Notes", value: notes)
+                    LabeledContent("Initial note", value: notes)
                 }
             }
         }
@@ -427,7 +427,7 @@ struct ApplicationFormView: View {
         switch step {
         case .basics: return "Basics"
         case .details: return "Details"
-        case .notes: return "Notes"
+        case .notes: return "Activity"
         case .review: return "Confirm"
         }
     }
@@ -503,12 +503,23 @@ struct ApplicationFormView: View {
     }
 
     private func save() {
-        let app = JobApplication(company: company.trimmingCharacters(in: .whitespacesAndNewlines),
-                                 position: position.trimmingCharacters(in: .whitespacesAndNewlines),
+        let trimmedCompany = company.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPosition = position.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let activityNotes = ApplicationNote.activitiesForNewApplication(
+            company: trimmedCompany,
+            position: trimmedPosition,
+            status: status,
+            dateApplied: dateApplied,
+            notes: notesPolicy.isEditable(existingNotes: originalNotes) ? trimmedNotes : nil
+        )
+
+        let app = JobApplication(company: trimmedCompany,
+                                 position: trimmedPosition,
                                  status: status,
                                  dateApplied: dateApplied,
                                  location: location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : location,
-                                 notes: notesPolicy.isEditable(existingNotes: originalNotes) ? (notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes) : originalNotes,
+                                 notes: notesPolicy.isEditable(existingNotes: originalNotes) ? ApplicationNote.encoded(activityNotes) : originalNotes,
                                  companyURL: companyURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : companyURL,
                                  jobURL: jobURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : jobURL,
                                  companyLogoURL: companyLogoURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : companyLogoURL)

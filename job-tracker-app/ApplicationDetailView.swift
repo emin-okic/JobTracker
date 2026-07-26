@@ -190,7 +190,7 @@ struct ApplicationDetailView: View {
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
-                Label("Notes", systemImage: "text.bubble.fill")
+                Label("Activity", systemImage: "clock.badge.checkmark.fill")
                     .font(.headline)
 
                 Spacer()
@@ -236,9 +236,9 @@ struct ApplicationDetailView: View {
             Image(systemName: "note.text")
                 .font(.title2)
                 .foregroundStyle(.secondary)
-            Text("No notes yet")
+            Text("No activity yet")
                 .font(.subheadline.weight(.semibold))
-            Text("Add a quick update after recruiter calls, interviews, follow-ups, or offer changes.")
+            Text("Log follow-ups, interviews, offers, rejections, or other notes as they happen.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -252,7 +252,30 @@ struct ApplicationDetailView: View {
 
     private var noteComposer: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            TextField("Add a note", text: $viewModel.draftNote, axis: .vertical)
+            Menu {
+                ForEach(ApplicationActivityType.allCases) { activityType in
+                    Button {
+                        viewModel.draftActivityType = activityType
+                    } label: {
+                        Label(activityType.title, systemImage: activityType.systemImage)
+                    }
+                }
+            } label: {
+                Image(systemName: viewModel.draftActivityType.systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle()
+                            .fill(Color.accentColor.opacity(0.12))
+                    )
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.accentColor)
+            .accessibilityLabel("Activity Type")
+            .accessibilityValue(viewModel.draftActivityType.title)
+
+            TextField("Add activity", text: $viewModel.draftNote, axis: .vertical)
                 .lineLimit(2...5)
                 .textFieldStyle(.plain)
                 .focused($isNoteComposerFocused)
@@ -278,8 +301,8 @@ struct ApplicationDetailView: View {
             .buttonStyle(.plain)
             .disabled(!viewModel.canAddNote)
             .foregroundStyle(viewModel.canAddNote ? Color.accentColor : Color.secondary.opacity(0.45))
-            .accessibilityLabel("Add Note")
-            .accessibilityIdentifier("addNoteButton")
+            .accessibilityLabel("Add Activity")
+            .accessibilityIdentifier("addActivityButton")
         }
     }
 

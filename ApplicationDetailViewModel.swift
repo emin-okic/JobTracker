@@ -15,6 +15,7 @@ final class ApplicationDetailViewModel: ObservableObject {
     @Published var showingDeleteConfirm: Bool = false
     @Published var showShare: Bool = false
     @Published var draftNote: String = ""
+    @Published var draftActivityType: ApplicationActivityType = .note
 
     let policy: NotesEditingPolicy
     private(set) var app: JobApplication
@@ -44,12 +45,13 @@ final class ApplicationDetailViewModel: ObservableObject {
             let noteText = notes.map { note in
                 "- \(note.createdAt.formatted(date: .abbreviated, time: .shortened)): \(note.body)"
             }.joined(separator: "\n")
-            parts.append("Notes:\n\(noteText)")
+            parts.append("Activity:\n\(noteText)")
         }
         return parts.joined(separator: "\n")
     }
 
     func update(with updated: JobApplication) {
+        let previousStatus = app.status
         app.company = updated.company
         app.position = updated.position
         app.status = updated.status
@@ -62,6 +64,13 @@ final class ApplicationDetailViewModel: ObservableObject {
         app.companyURL = updated.companyURL
         app.jobURL = updated.jobURL
         app.companyLogoURL = updated.companyLogoURL
+
+        if let statusActivity = ApplicationNote.statusChange(from: previousStatus, to: updated.status) {
+            var updatedNotes = notes
+            updatedNotes.append(statusActivity)
+            app.notes = ApplicationNote.encoded(updatedNotes)
+        }
+
         objectWillChange.send()
     }
 
@@ -70,9 +79,10 @@ final class ApplicationDetailViewModel: ObservableObject {
         guard !trimmed.isEmpty else { return }
 
         var updatedNotes = notes
-        updatedNotes.append(ApplicationNote(body: trimmed))
+        updatedNotes.append(ApplicationNote(body: draftActivityType.formattedBody(from: trimmed)))
         app.notes = ApplicationNote.encoded(updatedNotes)
         draftNote = ""
+        draftActivityType = .note
         objectWillChange.send()
     }
 
