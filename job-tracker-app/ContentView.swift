@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var showingAddSheet = false
     @State private var selectedProgressRange: ApplicationProgressRange?
     @State private var searchText = ""
+    @State private var overviewMode: ApplicationOverviewMode = .list
     @State private var path: [UUID] = []
     @State private var selectedApplicationID: UUID?
     @State private var selectedIDs: Set<UUID> = []
@@ -63,6 +64,22 @@ struct ContentView: View {
     private enum ApplicationListMode {
         case navigationStack
         case landscapeSelection
+    }
+
+    private enum ApplicationOverviewMode: String, CaseIterable, Identifiable {
+        case list = "List"
+        case visual = "Visual"
+
+        var id: String { rawValue }
+
+        var systemImage: String {
+            switch self {
+            case .list:
+                "list.bullet"
+            case .visual:
+                "point.3.connected.trianglepath.dotted"
+            }
+        }
     }
 
     var body: some View {
@@ -220,11 +237,44 @@ struct ContentView: View {
                 compactProgressCard(for: .today, count: todaysApplications.count)
                 compactProgressCard(for: .week, count: weeklyApplications.count)
             }
+
+            overviewModeToggle
         }
         .padding(.horizontal)
         .padding(.top, 8)
         .padding(.bottom, 6)
         .background(Color(.systemGroupedBackground))
+    }
+
+    private var overviewModeToggle: some View {
+        HStack(spacing: 4) {
+            ForEach(ApplicationOverviewMode.allCases) { mode in
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
+                        overviewMode = mode
+                    }
+                } label: {
+                    Label(mode.rawValue, systemImage: mode.systemImage)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(overviewMode == mode ? .primary : .secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(overviewMode == mode ? Color(.systemBackground) : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("\(mode.rawValue.lowercased())OverviewModeButton")
+                .accessibilityAddTraits(overviewMode == mode ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.secondary.opacity(0.12))
+        )
     }
 
     private func compactProgressCard(for range: ApplicationProgressRange, count: Int) -> some View {
@@ -282,6 +332,13 @@ struct ContentView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
+
+                overviewModeToggle
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
             }
 
             if let selectedProgressRange {
@@ -292,7 +349,14 @@ struct ContentView: View {
                     .listRowSeparator(.hidden)
             }
 
-            if isEditing {
+            if overviewMode == .visual && !isEditing {
+                PipelineHistoryView(applications: filteredApplications, compact: mode == .landscapeSelection) { app in
+                    select(app, mode: mode)
+                }
+                .listRowInsets(EdgeInsets(top: 0, leading: mode == .landscapeSelection ? 6 : 0, bottom: 0, trailing: mode == .landscapeSelection ? 6 : 0))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            } else if isEditing {
                 ForEach(filteredApplications) { app in
                     Button {
                         toggleSelection(for: app)
